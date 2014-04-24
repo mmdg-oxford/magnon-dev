@@ -8,6 +8,9 @@
 !-----------------------------------------------------------------------
 PROGRAM phonon
   !-----------------------------------------------------------------------
+
+  !!!! KUN AND HENRY's MAGNON CODE !!!
+
   !
   ! ... This is the main driver of the phonon code.
   ! ... It reads all the quantities calculated by pwscf, it
