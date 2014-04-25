@@ -7,16 +7,11 @@
 !
 !
 !----------------------------------------------------------------------
-subroutine dvqpsi_mag_us (ik, uact, addnlcc)
+subroutine dvqpsi_us (dbext, ik, uact, addnlcc)
   !----------------------------------------------------------------------
   !
-  ! This routine calculates dV_bare/dtau * psi for one perturbation
-  ! with a given q. The displacements are described by a vector u.
-  ! The result is stored in dvpsi. The routine is called for each k point
-  ! and for each pattern u. It computes simultaneously all the bands.
-  ! It implements Eq. B29 of PRB 64, 235118 (2001). The contribution
-  ! of the local pseudopotential is calculated here, that of the nonlocal
-  ! pseudopotential in dvqpsi_us_only.
+  ! This routine applies the external magnetic field to 
+  ! the wave functions in the first iteration of the self-consistent process.
   !
   !
   USE kinds, only : DP
@@ -60,6 +55,7 @@ subroutine dvqpsi_mag_us (ik, uact, addnlcc)
   ! counter on real mesh
 
   complex(DP) :: gtau, gu, fact, u1, u2, u3, gu0
+  complex(DP) :: dbext(dffts%nnr) 
   complex(DP) , allocatable, target :: aux (:)
   complex(DP) , allocatable :: aux1 (:), aux2 (:)
   complex(DP) , pointer :: auxs (:)
@@ -77,16 +73,69 @@ subroutine dvqpsi_mag_us (ik, uact, addnlcc)
   allocate (aux1(dffts%nnr))
   allocate (aux2(dffts%nnr))
   !
+  !    We start by computing the contribution of the local potential.
+  !    The computation of the derivative of the local potential is done in
+  !    reciprocal space while the product with the wavefunction is done in
+  !    real space
   !
-  !   Add B field here...      
+  ikk = ikks(ik)
+  dvpsi(:,:) = (0.d0, 0.d0)
+  aux1(:) = (0.d0, 0.d0)
+
+  aux1 (:) = dbext(:)
+
   !
+  ! add NLCC when present
   !
-  !   We add the contribution of the nonlocal potential in the US form
-  !   First a term similar to the KB case.
-  !   Then a term due to the change of the D coefficients.
+   if (nlcc_any.and.addnlcc) then
+      WRITE(6,'("WARNING NLCC NOT IMPLEMENTED.")')
+   endif
   !
-  call dvqpsi_us_only (ik, uact)
+  ! Now we compute dV_loc/dtau in real space
+  !
+  CALL invfft ('Smooth', aux1, dffts)
+  do ibnd = 1, nbnd
+     do ip=1,npol
+        aux2(:) = (0.d0, 0.d0)
+        if (ip==1) then
+           do ig = 1, npw
+              aux2 (nls (igk (ig) ) ) = evc (ig, ibnd)
+           enddo
+        else
+           do ig = 1, npw
+              aux2 (nls (igk (ig) ) ) = evc (ig+npwx, ibnd)
+           enddo
+        end if
+        !
+        !  This wavefunction is computed in real space
+        !
+        CALL invfft ('Wave', aux2, dffts)
+        do ir = 1, dffts%nnr
+           aux2 (ir) = aux2 (ir) * aux1 (ir)
+        enddo
+        !
+        ! and finally dV_loc/dtau * psi is transformed in reciprocal space
+        !
+        CALL fwfft ('Wave', aux2, dffts)
+        if (ip==1) then
+           do ig = 1, npwq
+              dvpsi (ig, ibnd) = aux2 (nls (igkq (ig) ) )
+           enddo
+        else
+           do ig = 1, npwq
+              dvpsi (ig+npwx, ibnd) = aux2 (nls (igkq (ig) ) )
+           enddo
+        end if
+     enddo
+  enddo
+  !
+  deallocate (aux2)
+  deallocate (aux1)
+  if (nlcc_any.and.addnlcc) then
+     deallocate (aux)
+     if (doublegrid) deallocate (auxs)
+  endif
 
   call stop_clock ('dvqpsi_us')
   return
-end subroutine dvqpsi_mag_us
+end subroutine dvqpsi_us

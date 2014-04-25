@@ -23,8 +23,6 @@ SUBROUTINE close_phq( flag )
   USE control_ph,    ONLY : zue, epsil
   USE recover_mod,   ONLY : clean_recover
   USE output,        ONLY : fildrho, fildvscf
-  USE ramanm,        ONLY : lraman, elop, iuchf, iud2w, iuba2
-  USE el_phon,       ONLY : elph_mat,iunwfcwann
   !
   IMPLICIT NONE
   !
@@ -104,22 +102,10 @@ SUBROUTINE close_phq( flag )
      ENDIF
   ENDIF
   !
-  IF (lraman .OR.elop) THEN
-     INQUIRE( UNIT=iuchf, OPENED=opnd ) 
-     IF (opnd) CLOSE ( UNIT=iuchf, STATUS = 'KEEP' )
-     INQUIRE( UNIT=iud2w, OPENED=opnd ) 
-     IF (opnd) CLOSE ( UNIT=iud2w, STATUS = 'KEEP' )
-     INQUIRE( UNIT=iuba2, OPENED=opnd ) 
-     IF (opnd) CLOSE ( UNIT=iuba2, STATUS = 'KEEP' )
-  ENDIF
   !
   INQUIRE( UNIT=iunigk, OPENED=opnd ) 
   IF (opnd) CLOSE( UNIT = iunigk, STATUS = 'DELETE' )
 
-  IF (elph_mat) THEN
-    INQUIRE( UNIT=iunwfcwann, OPENED=opnd ) 
-    IF (opnd) CLOSE( UNIT = iunwfcwann, STATUS = 'KEEP' ) 
-  ENDIF
   !
   RETURN
   !

@@ -57,26 +57,8 @@ SUBROUTINE phqscf
   !    For each irreducible representation we compute the change
   !    of the wavefunctions
   !
-  DO irr = 1, nirr
-
-!!!!PHONON!!!!!
-     IF ( (comp_irr (irr) == 1) .AND. (done_irr (irr) == 0) ) THEN
-        npe=npert(irr)
         ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag, npe))
         imode0 = 0
-        DO irr1 = 1, irr - 1
-           imode0 = imode0 + npert (irr1)
-        ENDDO
-        IF (npe == 1) THEN
-           WRITE( stdout, '(//,5x,"Representation #", i3," mode # ",i3)') &
-                              irr, imode0 + 1
-        ELSE
-           WRITE( stdout, '(//,5x,"Representation #", i3," modes # ",8i3)') &
-                              irr, (imode0+irr1, irr1=1,npe)
-        ENDIF
-        !
-        !    then for this irreducible representation we solve the linear system
-        !
         IF (okvan) THEN
            ALLOCATE (int3 ( nhm, nhm, npe, nat, nspin_mag))
            IF (okpaw) ALLOCATE (int3_paw (nhm, nhm, npe, nat, nspin_mag))
@@ -85,38 +67,10 @@ SUBROUTINE phqscf
 
 
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
-
-        CALL solve_linter (irr, imode0, npe, drhoscfs)
-
+        CALL solve_linter (drhoscfs)
         WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
         !
         !   Add the contribution of this mode to the dynamical matrix
-        !
-        IF (convt) THEN
-           CALL drhodv (imode0, npe, drhoscfs)
-           !
-           !   add the contribution of the modes imode0+1 -> imode+npe
-           !   to the effective charges Z(Us,E) (Us=scf,E=bare)
-           !
-           IF (zue) CALL add_zstar_ue (imode0, npe )
-           IF (zue.AND. okvan) CALL add_zstar_ue_us(imode0, npe )
-           IF (zue) THEN
-#ifdef __MPI
-              call mp_sum ( zstarue0_rec, intra_pool_comm )
-              call mp_sum ( zstarue0_rec, inter_pool_comm )
-#endif
-              zstarue0(:,:)=zstarue0(:,:)+zstarue0_rec(:,:)
-           END IF
-           !
-           WRITE( stdout, '(/,5x,"Convergence has been achieved ")')
-           done_irr (irr) = 1
-        ELSE
-           WRITE( stdout, '(/,5x,"No convergence has been achieved ")')
-           CALL stop_smoothly_ph (.FALSE.)
-        ENDIF
-        rec_code=20
-        CALL write_rec('done_drhod',irr,0.0_DP,-1000,.false.,npe,&
-                        drhoscfs)
         !
         IF (okvan) THEN
            DEALLOCATE (int3)
@@ -126,10 +80,6 @@ SUBROUTINE phqscf
         tcpu = get_clock ('PHONON')
         !
         DEALLOCATE (drhoscfs)
-     ENDIF
-
-  ENDDO
-
   CALL stop_clock ('phqscf')
   RETURN
 END SUBROUTINE phqscf

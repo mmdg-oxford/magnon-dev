@@ -34,22 +34,18 @@ subroutine bcast_ph_input ( )
   USE ions_base,     ONLY : amass
   USE io_global,   ONLY : ionode_id
   USE run_info,   ONLY : title
-  USE el_phon,    ONLY : elph_nbnd_min,elph_nbnd_max,el_ph_ngauss, el_ph_nsigma, el_ph_sigma
   USE dfile_star, ONLY : drho_star, dvscf_star
 
   implicit none
   !
   ! logicals
   !
-  call mp_bcast (lgamma, ionode_id )
-  call mp_bcast (epsil, ionode_id )
   call mp_bcast (trans, ionode_id )
   call mp_bcast (zue, ionode_id )
   call mp_bcast (zeu, ionode_id )
   call mp_bcast (reduce_io, ionode_id )
   call mp_bcast (ldisp, ionode_id )
   call mp_bcast (lraman, ionode_id )
-  call mp_bcast (elop, ionode_id )
   call mp_bcast (fpol, ionode_id )
   call mp_bcast (recover, ionode_id )
   call mp_bcast (asr, ionode_id )
@@ -79,10 +75,6 @@ subroutine bcast_ph_input ( )
   CALL mp_bcast( k1, ionode_id )
   CALL mp_bcast( k2, ionode_id )
   CALL mp_bcast( k3, ionode_id )
-  CALL mp_bcast( elph_nbnd_min, ionode_id )
-  CALL mp_bcast( elph_nbnd_max, ionode_id )
-  CALL mp_bcast( el_ph_ngauss, ionode_id )
-  CALL mp_bcast( el_ph_nsigma, ionode_id )
 
   !
   ! real*8
@@ -94,7 +86,6 @@ subroutine bcast_ph_input ( )
   call mp_bcast (alpha_mix, ionode_id )
   call mp_bcast (max_seconds, ionode_id )
   call mp_bcast (dek, ionode_id )
-  CALL mp_bcast( el_ph_sigma, ionode_id )
   !
   ! characters
   !
@@ -104,7 +95,6 @@ subroutine bcast_ph_input ( )
   call mp_bcast (fildrho, ionode_id )
   call mp_bcast (tmp_dir, ionode_id )
   call mp_bcast (prefix, ionode_id )
-  call mp_bcast (electron_phonon, ionode_id )
   !
   ! derived type (one bit at a time)
   !

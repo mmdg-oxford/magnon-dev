@@ -41,7 +41,6 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   USE wvfct,              ONLY : nbnd, nbndx
   USE control_flags,      ONLY : ethr, isolve, david, max_cg_iter, &
                                  noinv, modenum, use_para_diag
-  USE el_phon,            ONLY : elph_mat
   USE mp_global,          ONLY : kunit
   USE spin_orb,           ONLY : domag
   USE noncollin_module,   ONLY : noncolin
@@ -111,7 +110,6 @@ SUBROUTINE setup_nscf ( newgrid, xq )
      ! In the case of electron-phonon matrix element with
      ! wannier functions the k-points should not be reduced
      !
-     skip_equivalence = elph_mat
      CALL kpoint_grid ( nrot, time_reversal, skip_equivalence, s, t_rev, &
                       bg, nk1*nk2*nk3, k1,k2,k3, nk1,nk2,nk3, nkstot, xk, wk)
   endif
@@ -120,7 +118,6 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   ! ... If some symmetries of the lattice are missing in the crystal,
   ! ... "irreducible_BZ" computes the missing k-points.
   !
-  if(.not.elph_mat) &
   CALL irreducible_BZ (nrot, s, nsymq, minus_q, magnetic_sym, &
                        at, bg, npk, nkstot, xk, wk, t_rev)
   !

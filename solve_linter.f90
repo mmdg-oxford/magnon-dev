@@ -48,7 +48,6 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
                                    alpha_pv, lgamma, lgamma_gamma, convt, &
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover
-  USE el_phon,              ONLY : elph
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwf, lrdwf, iubar, lrbar, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
@@ -392,7 +391,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      !
      !  In the noncolinear, spin-orbit case rotate dbecsum
      !
-     IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum, npe)
+     !IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum, npe)
      !
      !    Now we compute for all perturbations the total charge and potential
      !
