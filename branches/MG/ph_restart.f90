@@ -11,12 +11,12 @@ MODULE ph_restart
   !----------------------------------------------------------------------------
   !
   ! ... this module contains methods to read and write data saved by the
-  !     phonon code to restart smoothly
+  !     GW code to restart smoothly
   !
   USE iotk_module
   !
   USE kinds,     ONLY : DP
-  USE io_files,  ONLY : prefix, iunpun, xmlpun, xmlpun_base, &
+  USE io_files,  ONLY : prefix, iunpun, xmlpun, &
                         qexml_version, qexml_version_init
   USE control_ph, ONLY : tmp_dir_ph
   USE io_global, ONLY : ionode, ionode_id
@@ -56,10 +56,7 @@ MODULE ph_restart
       !------------------------------------------------------------------------
       !
       USE global_version,       ONLY : version_number
-      USE control_ph,           ONLY : current_iq, done_bands, &
-                                       ldisp, epsil, trans, zue, zeu
-      USE ramanm,               ONLY : lraman, elop
-      USE el_phon,              ONLY : elph
+      USE control_ph,           ONLY : current_iq, done_bands, ldisp, trans
       USE disp, ONLY : nqs, x_q
       USE xml_io_base, ONLY : write_header, create_directory
       !
@@ -71,7 +68,6 @@ MODULE ph_restart
       CHARACTER(LEN=256)  :: dirname, filename
       INTEGER :: ierr
       CHARACTER(LEN=6), EXTERNAL :: int_to_char
-      LOGICAL :: exst
       !
       IF ( ionode ) THEN
          !
@@ -88,14 +84,9 @@ MODULE ph_restart
       !
       dirname = TRIM( tmp_dir_ph ) // TRIM( prefix ) // '.phsave'
       !
-      ! ... create the main restart directory if it is not there
+      ! ... create the main restart directory
       !
-      IF (ionode) inquire (file =TRIM(dirname)//'/data-file.xml', &
-                           exist = exst)
-      !
-      CALL mp_bcast( exst, ionode_id, intra_image_comm )
-      !
-      IF (.NOT. exst) CALL create_directory( dirname )
+      CALL create_directory( dirname )
       !
       ! ... open the ph_recover file
       !
@@ -109,9 +100,9 @@ MODULE ph_restart
                              & TRIM( xmlpun ), BINARY = .FALSE., IERR = ierr )
          ELSEIF (what=='data' .OR. what=='data_dyn') THEN
             filename= TRIM( dirname ) // '/' // &
-                    & TRIM( xmlpun_base ) // '.' // TRIM(int_to_char(current_iq))
+                    & TRIM( xmlpun ) // '.' // TRIM(int_to_char(current_iq))
             IF (what=='data') &
-               CALL iotk_open_write( iunpun, FILE = TRIM( filename ) // '.xml', &
+               CALL iotk_open_write( iunpun, FILE = TRIM( filename ), &
                                           BINARY = .FALSE., IERR = ierr )
          ELSE
             CALL errore('ph_writefile','unknown what',1)
@@ -124,7 +115,7 @@ MODULE ph_restart
       CALL errore( 'ph_writefile ', &
                    'cannot open xml_recover file for writing', ierr )
       !
-      IF ( ionode ) THEN
+      IF ( ionode ) THEN  
          !
          ! ... here we start writing the ph-punch-file
          !
@@ -134,24 +125,23 @@ MODULE ph_restart
          !
          IF (what=='init') THEN
          !
-            CALL write_header( "PH", TRIM(version_number) )
+            CALL write_header( "GW", TRIM(version_number) )
          !
 !-------------------------------------------------------------------------------
-! ... STATUS
+! ... STATUS 
 !-------------------------------------------------------------------------------
-!   With what='init' the routine writes the status of the code
+!   With what='init' the routine writes the status of the code 
 !   needed to control the main flow of the dispersion calculation.
-!   The mesh of q points, the current q, the main flags that control
-!   the run and the flag done_bands, that tells if this routine is
+!   The mesh of q points, the current q, the main flags that control 
+!   the run and the flag done_bands, that tells if this routine is 
 !   called before or after the band calculation.
 !
             CALL write_status_ph(current_iq, done_bands)
 !-------------------------------------------------------------------------------
-! ... CONTROL
+! ... CONTROL 
 !-------------------------------------------------------------------------------
          !
-            CALL write_control_ph( ldisp, epsil, trans, elph, zue, zeu, &
-                      lraman, elop )
+            CALL write_control_ph( ldisp, trans)
          !
 !-------------------------------------------------------------------------------
 ! ... Q POINTS
@@ -160,7 +150,7 @@ MODULE ph_restart
             CALL write_q( nqs, x_q )
          !
             CALL iotk_close_write( iunpun )
-         ELSEIF (what=='data') THEN
+         ELSEIF (what=='data') THEN 
          !
 !-------------------------------------------------------------------------------
 ! ... PARTIAL ITEMS
@@ -168,26 +158,19 @@ MODULE ph_restart
 !
 ! with what='data' this routine writes the information on the irreducible
 ! representations. Number of irreducible representations, number of modes
-! for each representation and displacements u. Moreover it writes the
-! point in which the phonon code has written the recover file: where_rec
-! and rec_code give the same information, where_rec is a string
-! and rec_code an integer. The former is easy to read in the xml file,
+! for each representation and displacements u. Moreover it writes the 
+! point in which the phonon code has written the recover file: where_rec 
+! and rec_code give the same information, where_rec is a string 
+! and rec_code an integer. The former is easy to read in the xml file, 
 ! the latter is simpler to use in the code. Moreover this routine saves
 ! the tensors that contain the result of the calculations done so far:
 ! epsilon, zstareu, ramtns, eloptns, dyn, zstarue.
 !
-             CALL write_partial_ph()
+            CALL write_partial_ph()
          !
          !
              CALL iotk_close_write( iunpun )
-         ELSEIF (what=='data_dyn') THEN
-!
-! with what='data_dyn' this routine writes the information calculated
-! separately for each irreducible representation. The contributions
-! of the representation to the dynamical matrix and to the Born effective
-! charges dP/du.
-!
-             CALL write_ph_dyn(filename,irr)
+         ELSEIF (what=='data_dyn') THEN 
 
          END IF
 
@@ -197,22 +180,15 @@ MODULE ph_restart
       RETURN
       !
       CONTAINS
-
+      
          SUBROUTINE write_partial_ph()
             USE modes, ONLY : nirr, npert, u, name_rap_mode, nsymq
             USE partial, ONLY : done_irr
-            USE control_ph, ONLY : current_iq, epsil, trans, zue, lgamma,&
-                                   where_rec, rec_code, done_epsil, done_zeu, &
-                                   done_zue
-            USE el_phon, ONLY : elph
-            USE ramanm,  ONLY : lraman, elop, ramtns, eloptns, done_lraman, &
-                                done_elop
-            USE efield_mod, ONLY : zstareu, zstarue, epsilon
+            USE control_ph, ONLY : current_iq, epsil, trans, zue, lgamma, where_rec, rec_code
 
             IMPLICIT NONE
             INTEGER :: imode0, imode, irr, ipert, iq
 
-            CALL iotk_write_begin( iunpun, "TENSOR_INFO" )
             !
             CALL iotk_write_dat(iunpun,"STOPPED_IN",where_rec)
             !
@@ -222,106 +198,21 @@ MODULE ph_restart
             !
             CALL iotk_write_dat(iunpun,"QPOINT_GROUP_RANK",nsymq)
             !
-!            IF (trans.OR.zeu.OR.elph) THEN
-              !
-               CALL iotk_write_dat(iunpun,"NUMBER_IRR_REP",nirr)
-              !
-               imode0=0
-               DO irr=1,nirr
-                  CALL iotk_write_dat(iunpun,"NUMBER_OF_PERTURBATIONS",&
-                                         npert(irr))
-                  CALL iotk_write_dat(iunpun,"SYMMETRY_TYPE",&
-                                         name_rap_mode(imode0+1))
-                  DO ipert=1,npert(irr)
-                     imode=imode0+ipert
-                     CALL iotk_write_dat(iunpun,"DISPLACEMENT_PATTERN",&
-                                         u(:,imode))
-                  ENDDO
-                  imode0=imode0+npert(irr)
-               ENDDO
-!            ENDIF
-!
 !   Save the current flags
-!
-            IF (lgamma) THEN
-               CALL iotk_write_dat( iunpun,"DONE_ELECTRIC_FIELD",done_epsil )
-               CALL iotk_write_dat( iunpun,"DONE_EFFECTIVE_CHARGE_EU",done_zeu )
-               CALL iotk_write_dat( iunpun,"DONE_EFFECTIVE_CHARGE_PH",done_zue )
-               CALL iotk_write_dat( iunpun,"DONE_RAMAN_TENSOR",done_lraman )
-               CALL iotk_write_dat( iunpun,"DONE_ELECTRO_OPTIC",done_elop )
-!
-!    save all calculated tensors
-!
-               IF (done_epsil) &
-                  CALL iotk_write_dat(iunpun,"DIELECTRIC_CONSTANT",epsilon)
-               IF (done_zeu) &
-                  CALL iotk_write_dat(iunpun,"EFFECTIVE_CHARGES_EU",zstareu)
-               IF (done_lraman) &
-                  CALL iotk_write_dat(iunpun,"RAMAN_TNS",ramtns)
-               IF (done_elop) &
-                  CALL iotk_write_dat(iunpun,"ELOP_TNS",eloptns)
-               IF (done_zue) &
-                  CALL iotk_write_dat(iunpun,"EFFECTIVE_CHARGES_UE",zstarue)
-            ENDIF
-            !
-             CALL iotk_write_end(iunpun, "TENSOR_INFO" )
             RETURN
          END SUBROUTINE write_partial_ph
+    END SUBROUTINE ph_writefile 
 
-        SUBROUTINE write_ph_dyn(filename, irr)
-           USE partial, ONLY : done_irr
-           USE dynmat,  ONLY : dyn_rec
-           USE efield_mod, ONLY : zstarue0_rec
-           USE control_ph, ONLY : trans, zue
-
-           IMPLICIT NONE
-           INTEGER :: irr, iunout
-           CHARACTER(LEN=256) :: filename, filename1
-           CHARACTER(LEN=6), EXTERNAL :: int_to_char
-
-           IF (trans) THEN
-              IF (done_irr(irr)/=0) THEN
-                 !
-                 CALL iotk_free_unit( iunout, ierr )
-                 !
-                 filename1= TRIM(filename) // "." // TRIM(int_to_char(irr))
-                 !
-                 CALL iotk_open_write(iunout, FILE = TRIM(filename1)//'.xml', &
-                                   BINARY = .FALSE., IERR = ierr )
-
-                 CALL iotk_write_begin(iunout, "PARTIAL_MATRIX")
-                 CALL iotk_write_dat(iunout, "DONE_IRR", done_irr(irr))
-                 CALL iotk_write_dat(iunout, "PARTIAL_DYN", dyn_rec(:,:))
-                 IF (zue) CALL iotk_write_dat(iunout, &
-                                           "PARTIAL_ZUE", zstarue0_rec(:,:))
-                 CALL iotk_write_end(iunout, "PARTIAL_MATRIX")
-                 CALL iotk_close_write(iunout)
-              ENDIF
-           ENDIF
-           RETURN
-        END SUBROUTINE write_ph_dyn
-
-    END SUBROUTINE ph_writefile
-
-    SUBROUTINE write_control_ph( ldisp, epsil, trans, elph, zue, zeu, &
-                      lraman, elop)
+    SUBROUTINE write_control_ph( ldisp, trans)
       !------------------------------------------------------------------------
       !
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: ldisp, epsil, trans, elph, zue, zeu, &
-                      lraman, elop
+      LOGICAL, INTENT(IN) :: ldisp, trans
 
       CALL iotk_write_begin( iunpun, "CONTROL" )
       !
       CALL iotk_write_dat( iunpun, "DISPERSION_RUN", ldisp )
-      CALL iotk_write_dat( iunpun, "ELECTRIC_FIELD", epsil )
-      CALL iotk_write_dat( iunpun, "PHONON_RUN", trans )
-      CALL iotk_write_dat( iunpun, "ELECTRON_PHONON", elph )
-      CALL iotk_write_dat( iunpun, "EFFECTIVE_CHARGE_EU", zeu )
-      CALL iotk_write_dat( iunpun, "EFFECTIVE_CHARGE_PH", zue )
-      CALL iotk_write_dat( iunpun, "RAMAN_TENSOR", lraman )
-      CALL iotk_write_dat( iunpun, "ELECTRO_OPTIC", elop )
-      !
+      CALL iotk_write_dat( iunpun, "GW_", trans )
       CALL iotk_write_end( iunpun, "CONTROL" )
       !
       RETURN
@@ -429,7 +320,7 @@ MODULE ph_restart
          !
       END SELECT
       !
-      IF ( lheader ) THEN
+      IF ( lheader ) THEN 
          !
          CALL read_header( dirname, ierr )
          IF (ierr /= 0 ) RETURN
@@ -443,7 +334,7 @@ MODULE ph_restart
       END IF
       IF ( lcontrol_ph_read ) THEN
          !
-         CALL read_control_ph( dirname, ierr )
+        CALL read_control_ph( dirname, ierr )
          IF ( ierr /= 0 ) RETURN
          !
       END IF
@@ -459,9 +350,11 @@ MODULE ph_restart
          IF ( ierr /= 0 ) RETURN
          !
       END IF
+
       IF ( lu_read ) THEN
          !
          CALL read_u( dirname, ierr )
+
          IF ( ierr /= 0 ) RETURN
          !
       END IF
@@ -514,7 +407,7 @@ MODULE ph_restart
       !
       CALL mp_bcast( qexml_version,       ionode_id, intra_image_comm )
       CALL mp_bcast( qexml_version_init,  ionode_id, intra_image_comm )
-
+      
       !
       ! init logical variables for versioning
       !
@@ -554,9 +447,9 @@ MODULE ph_restart
          !
          CALL iotk_scan_begin( iunpun, "STATUS_PH" )
          !
-         CALL iotk_scan_dat( iunpun, "DONE_BANDS", done_bands )
+         CALL iotk_scan_dat( iunpun, "DONE_BANDS", done_bands )         
          !
-         CALL iotk_scan_dat( iunpun, "CURRENT_Q", current_iq )
+         CALL iotk_scan_dat( iunpun, "CURRENT_Q", current_iq )         
          !
          CALL iotk_scan_end( iunpun, "STATUS_PH" )
          !
@@ -574,8 +467,6 @@ MODULE ph_restart
     SUBROUTINE read_control_ph( dirname, ierr )
       !------------------------------------------------------------------------
       USE control_ph, ONLY : ldisp, epsil, trans, zue, zeu
-      USE el_phon, ONLY : elph
-      USE ramanm,     ONLY : lraman, elop
 
       !
       IMPLICIT NONE
@@ -596,28 +487,13 @@ MODULE ph_restart
       !
       IF ( ionode ) THEN
          CALL iotk_scan_begin( iunpun, "CONTROL" )
-         !
          CALL iotk_scan_dat( iunpun, "DISPERSION_RUN", ldisp )
-         CALL iotk_scan_dat( iunpun, "ELECTRIC_FIELD", epsil )
          CALL iotk_scan_dat( iunpun, "PHONON_RUN", trans )
-         CALL iotk_scan_dat( iunpun, "ELECTRON_PHONON", elph )
-         CALL iotk_scan_dat( iunpun, "EFFECTIVE_CHARGE_EU", zeu )
-         CALL iotk_scan_dat( iunpun, "EFFECTIVE_CHARGE_PH", zue )
-         CALL iotk_scan_dat( iunpun, "RAMAN_TENSOR", lraman )
-         CALL iotk_scan_dat( iunpun, "ELECTRO_OPTIC", elop )
-         !
          CALL iotk_scan_end( iunpun, "CONTROL" )
-         !
          CALL iotk_close_read( iunpun )
       END IF
       CALL mp_bcast( ldisp,  ionode_id, intra_image_comm )
-      CALL mp_bcast( epsil,   ionode_id, intra_image_comm )
       CALL mp_bcast( trans,   ionode_id, intra_image_comm )
-      CALL mp_bcast( elph,    ionode_id, intra_image_comm )
-      CALL mp_bcast( zeu,     ionode_id, intra_image_comm )
-      CALL mp_bcast( zue,     ionode_id, intra_image_comm )
-      CALL mp_bcast( lraman,  ionode_id, intra_image_comm )
-      CALL mp_bcast( elop,    ionode_id, intra_image_comm )
       !
       RETURN
       !
@@ -690,7 +566,7 @@ MODULE ph_restart
     IF ( ionode ) THEN
        !
        filename= TRIM( dirname ) // '/' // &
-               & TRIM( xmlpun_base ) // '.' // TRIM(int_to_char(current_iq))
+               & TRIM( xmlpun ) // '.' // TRIM(int_to_char(current_iq))
        !
     END IF
 
@@ -703,9 +579,9 @@ MODULE ph_restart
           DO irr=0,nirr
              CALL iotk_free_unit( iunout, ierr )
              filename1=TRIM(filename) // "." // TRIM(int_to_char(irr))
-             CALL iotk_open_read(iunout, FILE = TRIM(filename1) // '.xml', &
+             CALL iotk_open_read(iunout, FILE = TRIM(filename1), &
                                        BINARY = .FALSE., IERR = ierr )
-
+             
              IF (ierr == 0 ) then
                 CALL iotk_scan_begin( iunout, "PARTIAL_MATRIX" )
                 CALL iotk_scan_dat(iunout,"DONE_IRR",done_irr(irr))
@@ -753,12 +629,10 @@ MODULE ph_restart
 !    -40         phq_setup    Only the displacements u have been read from file
 !    -30         phq_init     u and dyn(0) read from file
 !    -25                      not yet active. Restart in solve_e_fpol
-!    -20         solve_e      all previous. Stopped within solve_e. There
+!    -20         solve_e      all previous. Stopped within solve_e. There 
 !                             should be a recover file.
-!    -10         solve_e2     epsilon and zstareu are available if requested.
+!    -10         solve_e2     epsilon and zstareu are available if requested. 
 !                             Within solve_e2. There should be a recover file.
-!     2          phescf       all previous, raman tenson and elop tensor are
-!                             available if required.
 !     10         solve_linter all previous, within solve linter. Recover file
 !                             should be present.
 !     20         phqscf       all previous dyn_rec(irr) and zstarue0(irr) are
@@ -770,8 +644,6 @@ MODULE ph_restart
     USE control_ph, ONLY : current_iq, epsil, trans, zue, zeu, lgamma, &
                            where_rec, rec_code, rec_code_read, done_epsil, &
                            done_zeu, done_zue
-    USE el_phon, ONLY : elph
-    USE ramanm,  ONLY : lraman, elop, ramtns, eloptns, done_lraman, done_elop
     USE efield_mod, ONLY : zstareu, zstarue, epsilon
 
     IMPLICIT NONE
@@ -786,9 +658,9 @@ MODULE ph_restart
     IF ( ionode ) THEN
        !
        filename= TRIM( dirname ) // '/' // &
-               & TRIM( xmlpun_base ) // '.' // TRIM(int_to_char(current_iq))
+               & TRIM( xmlpun ) // '.' // TRIM(int_to_char(current_iq))
 
-       CALL iotk_open_read( iunpun, FILE = TRIM( filename ) // '.xml', IERR = ierr )
+       CALL iotk_open_read( iunpun, FILE = TRIM( filename ), IERR = ierr )
        !
     END IF
     !
@@ -811,73 +683,30 @@ MODULE ph_restart
               'problems with current_iq', 1 )
 
     IF (ionode) THEN
-!       IF (trans.OR.zeu.OR.elph) THEN
+       IF (trans.or.zeu) THEN
           CALL iotk_scan_dat(iunpun,"NUMBER_IRR_REP",nirr)
           imode0=0
           DO irr=0,nirr
              IF (irr > 0) THEN
                 CALL iotk_scan_dat(iunpun,"NUMBER_OF_PERTURBATIONS", npert(irr))
-                CALL iotk_scan_dat(iunpun,"SYMMETRY_TYPE",&
-                                                    name_rap_mode(imode0+1))
+                CALL iotk_scan_dat(iunpun,"SYMMETRY_TYPE", name_rap_mode(irr))
                 DO ipert=1,npert(irr)
                    imode=imode0+ipert
                    CALL iotk_scan_dat(iunpun,"DISPLACEMENT_PATTERN",u(:,imode))
-                   IF (ipert > 1) name_rap_mode(imode)=name_rap_mode(imode0+1)
                 ENDDO
                 imode0=imode0+npert(irr)
              ENDIF
           ENDDO
-!       ENDIF
+       ENDIF
 !
 !   read all flags
 !
-       IF (lgamma) THEN
-          CALL iotk_scan_dat( iunpun, "DONE_ELECTRIC_FIELD", done_epsil )
-          CALL iotk_scan_dat( iunpun, "DONE_EFFECTIVE_CHARGE_EU", done_zeu )
-          CALL iotk_scan_dat( iunpun, "DONE_EFFECTIVE_CHARGE_PH", done_zue )
-          CALL iotk_scan_dat( iunpun, "DONE_RAMAN_TENSOR", done_lraman )
-          CALL iotk_scan_dat( iunpun, "DONE_ELECTRO_OPTIC", done_elop )
-
-          IF (done_epsil) &
-             CALL iotk_scan_dat(iunpun,"DIELECTRIC_CONSTANT",epsilon)
-          IF (done_zeu) &
-             CALL iotk_scan_dat(iunpun,"EFFECTIVE_CHARGES_EU",zstareu)
-          IF (done_lraman) &
-             CALL iotk_scan_dat(iunpun,"RAMAN_TNS",ramtns)
-          IF (done_elop) &
-             CALL iotk_scan_dat(iunpun,"ELOP_TNS",eloptns)
-          IF (done_zue) &
-             CALL iotk_scan_dat(iunpun,"EFFECTIVE_CHARGES_UE",zstarue)
-       ENDIF
-       !
-       CALL iotk_scan_end( iunpun, "TENSOR_INFO" )
-       !
        CALL iotk_close_read( iunpun )
     ENDIF
 
     CALL mp_bcast( where_rec,  ionode_id, intra_image_comm )
     CALL mp_bcast( rec_code_read,  ionode_id, intra_image_comm )
     rec_code=rec_code_read
-    IF (lgamma) THEN
-       CALL mp_bcast( done_epsil,  ionode_id, intra_image_comm )
-       CALL mp_bcast( done_zeu,  ionode_id, intra_image_comm )
-       CALL mp_bcast( done_zue,  ionode_id, intra_image_comm )
-       CALL mp_bcast( done_lraman,  ionode_id, intra_image_comm )
-       CALL mp_bcast( done_elop,  ionode_id, intra_image_comm )
-       IF (done_epsil) CALL mp_bcast( epsilon, ionode_id, intra_image_comm )
-       IF (done_zeu) CALL mp_bcast( zstareu, ionode_id, intra_image_comm )
-       IF (done_zue) CALL mp_bcast( zstarue, ionode_id, intra_image_comm )
-       IF (done_lraman) CALL mp_bcast( ramtns, ionode_id, intra_image_comm )
-       IF (done_elop) CALL mp_bcast( eloptns,  ionode_id, intra_image_comm )
-    ENDIF
-
-!    IF (trans.OR.zeu.OR.elph) THEN
-       CALL mp_bcast( nirr,  ionode_id, intra_image_comm )
-       CALL mp_bcast( npert,  ionode_id, intra_image_comm )
-       CALL mp_bcast( u,  ionode_id, intra_image_comm )
-       CALL mp_bcast( name_rap_mode,  ionode_id, intra_image_comm )
-!    ENDIF
-
     RETURN
     END SUBROUTINE read_u
 
@@ -887,18 +716,20 @@ MODULE ph_restart
   !
   ! ...
   ! ... This routine sets the situation of the grid according to
-  ! ... the files that it finds on the directory .phsave.
-  ! ... Check if representation files exist and which representations
+  ! ... the files that it finds in the directory .phsave.
+
+  ! ... From phonon days it checks if representation files exist and which representations 
   ! ... have been already calculated.
+
   ! ... set the initial information on the grid
-  ! ... it sets done_iq and done_rep_iq to 1 for the q and the
+  ! ... it sets done_iq and done_rep_iq to 1 for the q and the 
   ! ... representations that have already been done.
   ! ... Moreover it sets rep_iq, the number of representation for each q.
   !
   USE disp, ONLY : nqs, done_iq, done_rep_iq, rep_iq, nsymq_iq, npert_iq
   USE ions_base, ONLY : nat
   USE control_ph, ONLY : trans, zeu
-  !
+  ! 
   IMPLICIT NONE
   !
   CHARACTER(LEN=256)  :: dirname, filename, filename1
@@ -913,10 +744,10 @@ MODULE ph_restart
         !
         CALL iotk_free_unit( iunout, ierr )
         filename= TRIM( dirname ) // '/' // &
-                & TRIM( xmlpun_base ) // '.' // TRIM(int_to_char(iq))
+                & TRIM( xmlpun ) // '.' // TRIM(int_to_char(iq))
 
-        CALL iotk_open_read( iunout, FILE = TRIM( filename ) // '.xml', IERR = ierr )
-
+        CALL iotk_open_read( iunout, FILE = TRIM( filename ), IERR = ierr )
+        
         IF (ierr /= 0) CYCLE
         CALL iotk_scan_begin( iunout, "TENSOR_INFO" )
         !
@@ -939,7 +770,7 @@ MODULE ph_restart
            ENDDO
            DO irr=0,rep_iq(iq)
               filename1=TRIM(filename) // "." // TRIM(int_to_char(irr))
-              CALL iotk_open_read(iunout, FILE = TRIM(filename1) // '.xml', &
+              CALL iotk_open_read(iunout, FILE = TRIM(filename1), &
                                        BINARY = .FALSE., IERR = ierr )
               IF (ierr /= 0 ) CYCLE
               CALL iotk_scan_begin( iunout, "PARTIAL_MATRIX" )
@@ -953,8 +784,8 @@ MODULE ph_restart
                  done_iq(iq)=0
                  EXIT
               ENDIF
-           ENDDO
-        END IF
+           ENDDO    
+        END IF 
      END IF
   END DO
   !
@@ -997,7 +828,7 @@ MODULE ph_restart
    END SUBROUTINE init_status_run
 
    SUBROUTINE destroy_status_run()
-   USE start_k,    ONLY : xk_start, wk_start
+   USE start_k,         ONLY : xk_start, wk_start
    USE disp, ONLY : nqs, done_iq, done_rep_iq, rep_iq, nsymq_iq, npert_iq, &
                     comp_iq, comp_irr_iq, x_q
    IMPLICIT NONE
@@ -1011,8 +842,8 @@ MODULE ph_restart
    IF (ALLOCATED(comp_iq)) DEALLOCATE(comp_iq)
    IF (ALLOCATED(comp_irr_iq)) DEALLOCATE(comp_irr_iq)
 !
-! Note that these two variables are allocated by read_file.
-! They cannot be deallocated by clean_pw because the starting xk and wk
+! Note that these two variables are allocated by read_file. 
+! They cannot be deallocated by clean_pw because the starting xk and wk 
 ! points must be known at each q point.
 ! The logic of these two variables must be improved.
 !

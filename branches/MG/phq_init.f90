@@ -59,8 +59,6 @@ SUBROUTINE phq_init()
   USE mp_global,           ONLY : intra_pool_comm
   USE mp,                  ONLY : mp_sum
   USE acfdtest,            ONLY : acfdt_is_active, acfdt_num_der
-  USE el_phon,             ONLY : elph_mat, iunwfcwann, npwq_refolded, &
-                           kpq,g_kpq,igqg,xk_gamma, lrwfcr
   !
   IMPLICIT NONE
   !
@@ -121,28 +119,6 @@ SUBROUTINE phq_init()
   END DO
   !
   IF ( nksq > 1 ) REWIND( iunigk )
-  !
- 
-  !
-  ! only for electron-phonon coupling with wannier functions
-  ! 
-  if(elph_mat) then
-    ALLOCATE(kpq(nksq),g_kpq(3,nksq),igqg(nksq))
-    ALLOCATE (xk_gamma(3,nksq))
- 
-    do ik=1,nksq
-      xk_gamma(1:3,ik)=xk(1:3,ikks(ik))
-    enddo
-      !
-      !first of all I identify q' in the list of xk such that
-      !   (i) q' is in the set of xk
-      !   (ii) k+q'+G=k+q
-      !  and G is a G vector depending on k and q.
-      !
-    call get_equivalent_kpq(xk_gamma,xq,kpq,g_kpq,igqg)
-
-  endif
-
  
   DO ik = 1, nksq
      !
@@ -189,12 +165,7 @@ SUBROUTINE phq_init()
      !
      ! ... read the wavefunctions at k
      !
-    if(elph_mat) then
-       call read_wfc_rspace_and_fwfft( evc , ik , lrwfcr , iunwfcwann , npw , igk )
-!       CALL davcio (evc, lrwfc, iunwfcwann, ik, - 1)
-    else
-       CALL davcio( evc, lrwfc, iuwfc, ikk, -1 )
-    endif
+     CALL davcio( evc, lrwfc, iuwfc, ikk, -1 )
      !
      ! ... e) we compute the becp terms which are used in the rest of
      ! ...    the code
@@ -224,31 +195,8 @@ SUBROUTINE phq_init()
      END DO
      !
      !
-!!!!!!!!!!!!!!!!!!!!!!!! ACFDT TEST !!!!!!!!!!!!!!!!
-  IF (acfdt_is_active) THEN
-     ! ACFDT -test always read calculated wcf from non_scf calculation
-     IF(acfdt_num_der) then 
-       CALL davcio( evq, lrwfc, iuwfc, ikq, -1 )
-     ELSE
-       IF ( .NOT. lgamma ) &
-          CALL davcio( evq, lrwfc, iuwfc, ikq, -1 )
-     ENDIF
-  ELSE
      ! this is the standard treatment
-     IF ( .NOT. lgamma .and..not. elph_mat )then 
         CALL davcio( evq, lrwfc, iuwfc, ikq, -1 )
-     ELSEIF(.NOT. lgamma .and. elph_mat) then
-        !
-        ! I read the wavefunction in real space and fwfft it
-        !
-        ikqg = kpq(ik)
-        call read_wfc_rspace_and_fwfft( evq , ikqg , lrwfcr , iunwfcwann , npwq , igkq )
-!        CALL davcio (evq, lrwfc, iunwfcwann, ikqg, - 1)
-        call calculate_and_apply_phase(ik, ikqg, igqg, &
-           npwq_refolded, g_kpq,xk_gamma, evq, .false.)
-     ENDIF
-  ENDIF
-!!!!!!!!!!!!!!!!!!!!!!!! END OF ACFDT TEST !!!!!!!!!!!!!!!!
      !
      ! diagonal elements of the unperturbed Hamiltonian,
      ! needed for preconditioning
@@ -280,8 +228,6 @@ SUBROUTINE phq_init()
   DEALLOCATE( aux1 )
      
   !
-  CALL dvanqq()
-  CALL drho()
   !
   IF ( ( epsil .OR. zue ) .AND. okvan ) THEN
      CALL compute_qdipol(dpqq)
@@ -289,7 +235,7 @@ SUBROUTINE phq_init()
      CALL qdipol_cryst()
   END IF
   !
-  IF ( trans ) CALL dynmat0_new()
+!  IF ( trans ) CALL dynmat0_new()
   !
   CALL stop_clock( 'phq_init' )
   !

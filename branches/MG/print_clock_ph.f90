@@ -30,7 +30,6 @@ subroutine print_clock_ph
   call print_clock ('newd')
   call print_clock ('dvanqq')
   call print_clock ('drho')
-  if ((epsil.or.zue).and.okvan) call print_clock ('cmpt_qdipol')
 
   if(epsil) then
      WRITE( stdout, * )
@@ -76,15 +75,8 @@ subroutine print_clock_ph
      call print_clock ('phqscf')
      call print_clock ('solve_linter')
      call print_clock ('drhodv')
-     if (zue) call print_clock('add_zstar_ue')
-     if (zue) call print_clock('add_zstar_1')
-     if (zue.and.okvan) call print_clock('add_zstar_us')
   endif
   WRITE( stdout, * )
-  call print_clock ('dynmat0')
-  call print_clock ('dynmat_us')
-  call print_clock ('addusdynmat1')
-  call print_clock ('d2ionq')
   if (nlcc_any) call print_clock ('dynmatcc')
   WRITE( stdout, * )
   call print_clock ('dynmat_us')

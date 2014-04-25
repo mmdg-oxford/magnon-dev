@@ -41,7 +41,6 @@ SUBROUTINE openfilq()
   USE ramanm,          ONLY : lraman, elop, iuchf, iud2w, iuba2, lrchf, lrd2w, lrba2
   USE acfdtest,        ONLY : acfdt_is_active, acfdt_num_der
   USE input_parameters,ONLY : nk1, nk2, nk3
-  USE el_phon,         ONLY : elph, elph_mat, iunwfcwann, lrwfcr
   USE dfile_star,      ONLY : dvscf_star
   USE dfile_autoname,  ONLY : dfile_name
   !
@@ -84,16 +83,6 @@ SUBROUTINE openfilq()
   IF (.NOT.exst.and..not.all_done) THEN
      CALL errore ('openfilq', 'file '//trim(prefix)//'.wfc not found', 1)
   END IF
-  IF (elph_mat) then
-     iunwfcwann=733
-     lrwfcr= 2 * dffts%nr1x*dffts%nr2x*dffts%nr3x *npol
-     if(ionode) then
-        CALL diropn (iunwfcwann, 'wfc_r', lrwfcr, exst, dvscf_star%dir)
-        IF (.NOT.exst) THEN
-           CALL errore ('openfilq', 'file '//trim(prefix)//'.wfc_r not found in Rotated_DVSCF', 1)
-        END IF
-     endif
-  END IF
   !
   ! From now on all files are written with the _ph prefix
   !
@@ -131,9 +120,7 @@ SUBROUTINE openfilq()
   iudrho = 23
   lrdrho = 2 * dfftp%nr1x * dfftp%nr2x * dfftp%nr3x * nspin_mag
   !
-  !
   !   Here the sequential files
-  !
   !   The igk at a given k (and k+q if q!=0)
   !
   iunigk = 24
@@ -141,99 +128,9 @@ SUBROUTINE openfilq()
   !
   !   a formatted file which contains the dynamical matrix in cartesian
   !   coordinates is opened in the current directory
-
   !   ... by the first node only, other nodes write on unit 6 (i.e./dev/null
   !   exception: electron-phonon calculation from saved data
   !  (iudyn is read, not written, by all nodes)
-  !
-  IF ( ( .NOT. ionode ) .AND. (.NOT.elph.OR.trans) ) THEN
-     iudyn = 6
-     GOTO 400
-  ENDIF
-
-  IF (((trans.AND.(start_irr/=0.OR.last_irr/=0)).OR.elph).AND..NOT.xmldyn) THEN
-     iudyn = 26
-     OPEN (unit=iudyn, file=fildyn, status='unknown', err=100, iostat=ios)
-100  CALL errore ('openfilq', 'opening file'//fildyn, ABS (ios) )
-     REWIND (iudyn)
-  ELSE
-     iudyn=0
-  ENDIF
-  !
-  !   An optional file for electron-phonon calculations containing deltaVscf
-  !
-400 IF (trim(fildvscf).NE.' ') THEN
-     iudvscf = 27
-     IF ( me_pool == 0 ) THEN
-           IF(trim(dvscf_star%ext).NE.' ' .and. elph_mat) THEN
-              fildvscf_rot = dfile_name(xq, at, TRIM(dvscf_star%ext), &
-                   TRIM(dvscf_star%dir)//prefix, &
-                   generate=.false., index_q=iq_dummy, equiv=.false. )
-              
-              WRITE(stdout,'(5x,5a)') "Opening dvscf file '",TRIM(fildvscf_rot), &
-                   "' (for reading) in directory '",trim(dvscf_star%dir),"'"
-              
-              CALL diropn (iudvscf, fildvscf_rot, lrdrho, exst, dvscf_star%dir)
-           ELSE
-              CALL diropn (iudvscf, fildvscf, lrdrho, exst )
-           ENDIF
-           IF (okpaw) THEN
-              filint=TRIM(fildvscf)//'_paw'
-              lint3paw = 2 * nhm * nhm * 3 * nat * nspin_mag
-              iuint3paw=34
-              !           IF(dvscf_dir.NE.' ') then
-              !              CALL diropn (iuint3paw, filint, lint3paw, exst, dvscf_dir)
-              !           ELSE
-              CALL diropn (iuint3paw, filint, lint3paw, exst)
-              !           ENDIF
-           ENDIF
-        END IF
-     END IF
-  !
-  !    In the USPP case we need two files for the Commutator, the first is
-  !    given by filbar and a second which just contains P_c x |psi>,
-  !    which is required for the calculation of the Born effective carges
-  !
-  IF (okvan .AND. (epsil .OR. zue)) THEN
-     iucom = 28
-     lrcom = 2 * nbnd * npwx * npol
-     CALL diropn (iucom, 'com', lrcom, exst)
-     IF (ext_recover.AND..NOT.exst) &
-         CALL errore ('openfilq', 'file '//trim(prefix)//'.com not found', 1)
-  !
-  !    In the USPP case we also need a file in  order to store derivatives
-  !    of kb projectors
-  !
-     iudvkb3 = 29
-     lrdvkb3 = 2 * npwx * nkb * 3
-     CALL diropn (iudvkb3, 'dvkb3', lrdvkb3, exst)
-     IF (ext_recover.AND..NOT.exst) &
-         CALL errore ('openfilq', 'file '//trim(prefix)//'.dvkb3 not found', 1)
-  ENDIF
-  IF (epsil .OR. zue) THEN
-     iuebar = 30
-     lrebar = 2 * nbnd * npwx * npol
-     CALL diropn (iuebar, 'ebar', lrebar, exst)
-     IF (ext_recover.AND..NOT.exst) &
-        CALL errore ('openfilq','file '//trim(prefix)//'.ebar not found', 1)
-  ENDIF
-  !
-  !    files used by raman calculation
-  !
-  IF (lraman .OR.elop) THEN
-     iuchf = 31
-     lrchf = 2 * nbnd * npwx * npol
-     CALL diropn (iuchf, 'cwf', lrchf, exst)
-
-     iud2w = 32
-     lrd2w = 2 * nbnd * npwx * npol
-     CALL diropn (iud2w, 'd2w', lrd2w, exst)
-
-     iuba2 = 33
-     lrba2 = 2 * nbnd * npwx * npol
-     CALL diropn(iuba2, 'ba2', lrba2, exst)
-  ENDIF
-
   RETURN
   !
 END SUBROUTINE openfilq

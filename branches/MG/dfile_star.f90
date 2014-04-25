@@ -374,10 +374,10 @@ SUBROUTINE write_dfile_star(descr, source, nsym, xq, u, nq, sxq, isq, s, &
       !
       ! Transform to the basis of the patterns at the new q...
       !
-      CALL set_irr (nat, at, bg, xq, s, sr, tau, ntyp, ityp, ftau, invs, nsym, &
-                    rtau, irt, rpat%irgq, rpat%nsymq, rpat%minus_q, rpat%irotmq, rpat%u, rpat%npert,   &
-                    rpat%nirr, rpat%gi, rpat%gimq, 0, .false., rpat%eigen, search_sym,&
-                    nspin_mag, t_rev, amass, rpat%num_rap_mode, rpat%name_rap_mode)
+      !CALL set_irr (nat, at, bg, xq, s, sr, tau, ntyp, ityp, ftau, invs, nsym, &
+      !              rtau, irt, rpat%irgq, rpat%nsymq, rpat%minus_q, rpat%irotmq, rpat%u, rpat%npert,   &
+      !              rpat%nirr, rpat%gi, rpat%gimq, 0, .false., rpat%eigen, search_sym,&
+      !              nspin_mag, t_rev, amass, rpat%num_rap_mode, rpat%name_rap_mode)
       !
       ONLY_IONODE_2b : IF (ionode) THEN
       dfile_rot_scr = (0._dp, 0._dp)

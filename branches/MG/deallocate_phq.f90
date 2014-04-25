@@ -14,8 +14,6 @@ subroutine deallocate_phq
   USE noncollin_module, ONLY : m_loc
   USE becmod, ONLY: bec_type, becp, deallocate_bec_type
   USE wavefunctions_module,  ONLY: evc
-
-  USE ramanm, ONLY: ramtns
   USE modes, ONLY : tmq, t, npert, u, rtau, name_rap_mode, num_rap_mode
   USE qpoint, ONLY : eigqts, igkq, ikks, ikqs, nksq
   USE efield_mod, ONLY : zstareu, zstarue, zstarue0, zstareu0, &
@@ -33,12 +31,10 @@ subroutine deallocate_phq
   USE units_ph, ONLY : this_dvkb3_is_on_file, this_pcxpsi_is_on_file
   USE dynmat, ONLY : dyn00, dyn_rec, dyn, w2
   USE control_ph, ONLY : lgamma
-  USE el_phon, ONLY : el_ph_mat
 
   IMPLICIT NONE
   INTEGER :: ik, ipol
 
-  if(allocated(ramtns)) deallocate (ramtns)
   if (lgamma) then
      if(associated(evq)) nullify(evq)
      if(associated(igkq)) nullify(igkq)
@@ -112,7 +108,6 @@ subroutine deallocate_phq
   end if
   call deallocate_bec_type ( becp )
 
-  if(allocated(el_ph_mat)) deallocate (el_ph_mat)
   if(allocated(m_loc))     deallocate(m_loc)
 
   if(allocated(drc)) deallocate(drc)

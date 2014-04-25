@@ -61,8 +61,6 @@ SUBROUTINE phq_readin()
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
   USE ph_restart,    ONLY : ph_readfile
   USE xml_io_base,   ONLY : create_directory
-  USE el_phon,       ONLY : elph,elph_mat,elph_simple,elph_nbnd_min, elph_nbnd_max, &
-                            el_ph_sigma, el_ph_nsigma, el_ph_ngauss,auxdvscf
   USE dfile_star,    ONLY : drho_star, dvscf_star
   !
   IMPLICIT NONE
@@ -98,9 +96,7 @@ SUBROUTINE phq_readin()
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star, &
-                       elph_nbnd_min, elph_nbnd_max, el_ph_ngauss,el_ph_nsigma, el_ph_sigma,  &
-                       electron_phonon
+                       drho_star, dvscf_star
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -113,8 +109,6 @@ SUBROUTINE phq_readin()
   ! epsil        : if true calculate dielectric constant
   ! trans        : if true calculate phonon
   ! electron-phonon : select the kind of electron-phonon calculation
-  ! elph         : if true calculate electron-phonon coefficients
-  ! elph_mat     : if true eph coefficients for wannier
   ! zue          : if .true. calculate effective charges ( d force / dE )
   ! zeu          : if .true. calculate effective charges ( d P / du )
   ! lraman       : if true calculate raman tensor
@@ -150,15 +144,6 @@ SUBROUTINE phq_readin()
   ! dvscf_star%dir, dvscf_star%ext, dvscf_star%basis : see dvscf_star%open
   ! drho_star%open  : like dvscf_star%open but for drho_q
   ! drho_star%dir, drho_star%ext, drho_star%basis : see drho_star%open
-   !
-  ! elph_nbnd_min,
-  ! elph_nbnd_max: if (elph_mat=.true.) it dumps the eph matrix element from elph_nbnd_min
-  !                  to elph_nbnd_max 
-  ! el_ph_ngauss,
-  ! el_ph_nsigma, 
-  ! el_ph_sigma  :  if (elph_mat=.true.) it defines the kind and the val-ue of the
-  !                 smearing to be used in the eph coupling calculation.
-  !             
 
   IF (ionode) THEN
   !
@@ -207,11 +192,6 @@ SUBROUTINE phq_readin()
   zue          = .FALSE.
   fpol         = .FALSE.
   electron_phonon=' '
-  elph_nbnd_min = 1
-  elph_nbnd_max = 0
-  el_ph_sigma = 0.02
-  el_ph_nsigma = 30
-  el_ph_ngauss = 1
   lraman       = .FALSE.
   elop         = .FALSE.
   max_seconds  =  1.E+7_DP
@@ -299,41 +279,16 @@ SUBROUTINE phq_readin()
 
   IF (modenum < 0) CALL errore ('phq_readin', ' Wrong modenum ', 1)
   IF (dek <= 0.d0) CALL errore ( 'phq_readin', ' Wrong dek ', 1)
-  !
-  SELECT CASE( trim( electron_phonon ) )
-  CASE( 'simple' )
-     elph=.true.
-     elph_mat=.false.
-     elph_simple=.true. 
-  CASE( 'Wannier' )
-     elph=.true.
-     elph_mat=.true.
-     elph_simple=.false.
-     auxdvscf=trim(fildvscf)
-  CASE( 'interpolated' )
-     elph=.true.
-     elph_mat=.false.
-     elph_simple=.false.
-  CASE DEFAULT
-     elph=.false.
-     elph_mat=.false.
-     elph_simple=.false.
-  END SELECT
 
   epsil = epsil .OR. lraman .OR. elop
 
   IF (modenum /= 0) search_sym=.FALSE.
   
-  if(elph_simple.or.elph_mat) then
-     trans=.false.
-  else
-     trans = trans .OR. ldisp
-  endif
+  trans = trans .OR. ldisp
    
   !
   ! Set default value for fildrho and fildvscf if they are required
   IF ( (lraman.OR.elop.OR.drho_star%open) .AND. fildrho == ' ') fildrho = 'drho'
-  IF ( (elph_mat.OR.dvscf_star%open) .AND. fildvscf == ' ') fildvscf = 'dvscf'
   !
   !  We can calculate  dielectric, raman or elop tensors and no Born effective
   !  charges dF/dE, but we cannot calculate Born effective charges dF/dE
@@ -485,17 +440,6 @@ SUBROUTINE phq_readin()
   IF (nbgrp > 1) &
      CALL errore('phq_readin','band parallelization not available in phonon',1)
 
-  IF (elph.and.nimage>1) CALL errore('phq_readin',&
-       'el-ph with image parallelization is not yet available',1)
-
-  if(elph_mat.and.fildvscf.eq.' ') call errore('phq_readin',&
-       'el-ph with wannier requires fildvscf',1)
-
-  IF(elph_mat.and.npool.ne.1) call errore('phq_readin',&
-       'el-ph with wannier : pools not implemented',1)
-  
-  IF (elph.OR.fildvscf /= ' ') lqdir=.TRUE.
-
   IF(dvscf_star%open.and.nimage>1) CALL errore('phq_readin',&
        'dvscf_star with image parallelization is not yet available',1)
   IF(drho_star%open.and.nimage>1) CALL errore('phq_readin',&
@@ -562,12 +506,6 @@ SUBROUTINE phq_readin()
   IF (tfixed_occ) &
      CALL errore('phq_readin','phonon with arbitrary occupations not tested',1)
   !
-  IF (elph.AND..NOT.lgauss) CALL errore ('phq_readin', 'Electron-&
-       &phonon only for metals', 1)
-!  IF (elph.AND.fildvscf.EQ.' ') CALL errore ('phq_readin', 'El-ph needs &
-!       &a DeltaVscf file', 1)
-  !   There might be other variables in the input file which describe
-  !   partial computation of the dynamical matrix. Read them here
   !
   CALL allocate_part ( nat )
   !

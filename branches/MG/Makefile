@@ -1,4 +1,4 @@
-# Makefile for phonon (PH)
+# Makefile for magnon (MG)
 
 include ../../make.sys
 
@@ -6,22 +6,18 @@ include ../../make.sys
 MODFLAGS= $(MOD_FLAG)../../iotk/src $(MOD_FLAG)../../Modules \
           $(MOD_FLAG)../../PW/src $(MOD_FLAG).
 
-PHOBJS = \
+MAGOBJS = \
 acfdtest.o \
 add_dkmds.o \
 add_for_charges.o \
-add_zstar_ue.o \
-add_zstar_ue_us.o \
 addcore.o \
 adddvepsi_us.o \
 adddvscf.o \
 addnlcc.o \
-addnlcc_zstar_eu_us.o \
 addusdbec.o \
 addusdbec_nc.o \
 addusddens.o \
 addusddense.o \
-addusdynmat.o \
 addusldos.o \
 allocate_part.o \
 allocate_pert.o \
@@ -41,7 +37,6 @@ clean_pw_ph.o \
 clinear.o \
 close_phq.o \
 commutator_Hx_psi.o \
-compute_alphasum.o \
 compute_becalp.o \
 compute_becsum_ph.o \
 compute_drhous.o \
@@ -52,7 +47,6 @@ compute_vsgga.o \
 compute_weight.o \
 deallocate_part.o \
 deallocate_phq.o \
-d2ionq.o \
 davcio_drho.o \
 dfile_autoname.o \
 dfile_star.o \
@@ -64,24 +58,10 @@ drhodvloc.o \
 drhodvnl.o \
 drhodvus.o \
 dv_of_drho.o \
-dvanqq.o \
 dvkb3.o \
 dvpsi_e.o \
-dvqpsi_us.o \
-dvqpsi_us_only.o \
-dyndia.o \
-dynmat0.o \
-dynmat_us.o \
-dynmatcc.o \
-dynmatrix.o \
+dvqpsi_mag_us.o \
 ef_shift.o \
-ep_matrix_element_wannier.o \
-elph.o \
-el_ph_collect.o \
-elphon.o \
-find_equiv_sites.o \
-find_mode_sym.o \
-find_irrep.o \
 generate_dynamical_matrix_c.o \
 generate_effective_charges_c.o \
 gmressolve_all.o \
@@ -91,7 +71,6 @@ incdrhoscf_nc.o \
 incdrhous.o \
 incdrhous_nc.o \
 initialize_ph.o \
-init_representations.o \
 io_dyn_mat.o \
 io_dyn_mat_old.o \
 io_pattern.o \
@@ -99,11 +78,9 @@ localdos.o \
 mix_pot.o \
 mode_group.o \
 newdq.o \
-obsolete.o \
 openfilq.o \
 orthogonalize.o \
 phcom.o \
-ph_restart.o \
 phescf.o \
 phq_init.o \
 phq_readin.o \
@@ -111,6 +88,7 @@ phq_recover.o \
 phq_setup.o \
 phq_summary.o \
 phqscf.o \
+ph_restart.o \
 polariz.o \
 print_clock_ph.o \
 prepare_q.o \
@@ -122,7 +100,6 @@ psym_dmag.o \
 psym_dmage.o \
 punch_plot_e.o \
 q_points.o \
-q_points_wannier.o \
 q2qstar_ph.o \
 qdipol_cryst.o \
 random_matrix.o \
@@ -131,13 +108,8 @@ rotate_dvscf_star.o \
 rotate_and_add_dyn.o \
 run_pwscf.o \
 save_ph_input.o \
-set_asr_c.o \
 set_defaults_pw.o \
 set_drhoc.o \
-set_int12_nc.o \
-set_irr.o \
-set_irr_nosym.o \
-set_irr_sym.o \
 set_small_group_of_q.o \
 setlocq.o \
 setqmod.o \
@@ -150,29 +122,17 @@ solve_linter.o \
 star_q.o \
 stop_ph.o \
 summarize.o \
-sym_and_write_zue.o \
 sym_def.o \
 sym_dmag.o \
 sym_dmage.o \
 symdvscf.o \
-symdyn_munu.o \
-symdynph_gq.o \
 syme.o \
 symm.o \
-transform_int_so.o \
-transform_int_nc.o \
-transform_alphasum_nc.o \
-transform_alphasum_so.o \
-transform_dbecsum_so.o \
-transform_dbecsum_nc.o \
 tra_write_matrix.o \
 trntnsc.o \
-write_epsilon_and_zeu.o \
 write_matrix.o \
 write_modes.o \
-write_rec.o \
-zstar_eu.o \
-zstar_eu_us.o
+write_rec.o 
 
 RAMANOBJS =    \
 cft_wave.o \
@@ -187,7 +147,6 @@ ramanm.o   \
 syme2.o    \
 solve_e2.o \
 solve_e_nscf.o \
-write_ramtns.o \
 d2mxc.o    \
 raman_mat.o\
 raman.o    \
@@ -206,42 +165,14 @@ LIBOBJS	= ../../flib/ptools.a ../../flib/flib.a ../../clib/clib.a ../../iotk/src
 
 TLDEPS= bindir mods libs pw
 
-all : tldeps libs-ph ph.x dynmat.x matdyn.x q2r.x lambda.x fqha.x q2qstar.x 
+all : tldeps libs-ph ph.x
 
 libs-ph : libph.a libphaux.a
 
-ph.x : phonon.o libph.a $(PWOBJS) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ phonon.o libph.a \
+ph.x : magnon.o libph.a $(PWOBJS) $(LIBOBJS)
+	$(LD) $(LDFLAGS) -o $@ magnon.o libph.a \
 		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/ph.x . )
-
-dynmat.x : dynmat.o libphaux.a  libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ dynmat.o libphaux.a libph.a \
-		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
-
-matdyn.x : matdyn.o libphaux.a libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ matdyn.o libphaux.a libph.a \
-		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
-
-q2r.x : q2r.o libphaux.a libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ q2r.o libphaux.a libph.a \
-		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
-
-q2qstar.x : q2qstar.o libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ q2qstar.o libph.a \
-		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
-
-lambda.x : lambda.o $(PWOBJS) $(QEMODS) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ lambda.o \
-                 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
-
-#fqha.o :
-#	$(MPIF90) $(FFLAGS_NOOPT) -c fqha.f90
 
 fqha.x : fqha.o $(PWOBJS) $(QEMODS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ fqha.o \
@@ -251,7 +182,7 @@ fqha.x : fqha.o $(PWOBJS) $(QEMODS) $(LIBOBJS)
 tldeps:
 	test -n "$(TLDEPS)" && ( cd ../.. ; $(MAKE) $(MFLAGS) $(TLDEPS) || exit 1) || :
 
-libph.a : $(PHOBJS) $(RAMANOBJS)
+libph.a : $(MAGOBJS) $(RAMANOBJS)
 	$(AR) $(ARFLAGS) $@ $?
 	$(RANLIB) $@
 
@@ -261,8 +192,7 @@ libphaux.a : $(PHAUXOBJS)
 	
 clean :
 	- /bin/rm -f *.x *.o *.a *~ *.F90 *.d *.mod *.i *.L
-	- /bin/rm -rf ../../bin/ph.x ../../bin/dynmat.x ../../bin/matdyn.x \
-	../../bin/q2r.x ../../bin/lambda.x ../../bin/fqha.x
+	- /bin/rm -rf ../../bin/ph.x ../../bin/dynmat.x ../../bin/matdyn.x 
 
 include make.depend
 # DO NOT DELETE

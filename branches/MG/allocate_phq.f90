@@ -41,7 +41,6 @@ subroutine allocate_phq
   USE dynmat, ONLY : dyn00, dyn, dyn_rec, w2
   USE modes, ONLY : u, rtau, npert, name_rap_mode, num_rap_mode
   USE control_ph, ONLY :  lgamma
-  USE el_phon, ONLY : el_ph_mat, elph
 
 
   implicit none
@@ -91,28 +90,16 @@ subroutine allocate_phq
   zstarue0=(0.0_DP,0.0_DP)
   zstarue0_rec=(0.0_DP,0.0_DP)
   if (okvan) then
-     allocate (int1 ( nhm, nhm, 3, nat, nspin_mag))
-     allocate (int2 ( nhm , nhm , 3 , nat , nat))
      if (okpaw) then
         allocate (becsumort ( nhm*(nhm+1)/2 , nat , nspin, 3*nat))
      endif
-     allocate (int4 ( nhm * (nhm + 1)/2,  3 , 3 , nat, nspin_mag))
-     allocate (int5 ( nhm * (nhm + 1)/2 , 3 , 3 , nat , nat))
      allocate (dpqq( nhm, nhm, 3, ntyp))
      IF (noncolin) THEN
-        ALLOCATE(int1_nc( nhm, nhm, 3, nat, nspin))
-        ALLOCATE(int4_nc( nhm, nhm, 3, 3, nat, nspin))
         ALLOCATE(becsum_nc( nhm*(nhm+1)/2, nat, npol, npol))
-        ALLOCATE(alphasum_nc( nhm*(nhm+1)/2, 3, nat, npol, npol))
         IF (lspinorb) THEN
-           ALLOCATE(int2_so( nhm, nhm, 3, nat , nat, nspin))
-           ALLOCATE(int5_so( nhm, nhm, 3, 3, nat , nat, nspin))
            allocate(dpqq_so( nhm, nhm, nspin, 3, ntyp))
         END IF
      END IF
-     allocate (alphasum ( nhm * (nhm + 1)/2 , 3 , nat , nspin_mag))
-     allocate (this_dvkb3_is_on_file(nksq))
-     this_dvkb3_is_on_file(:)=.false.
   endif
   allocate (this_pcxpsi_is_on_file(nksq,3))
   this_pcxpsi_is_on_file(:,:)=.false.
@@ -126,8 +113,5 @@ subroutine allocate_phq
      ENDDO
   END DO
   CALL allocate_bec_type ( nkb, nbnd, becp )
-
-  if (elph) allocate (el_ph_mat( nbnd, nbnd, nksq, 3*nat))
-  allocate ( ramtns (3, 3, 3, nat) )
   return
 end subroutine allocate_phq

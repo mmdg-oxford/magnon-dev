@@ -77,12 +77,10 @@ subroutine phq_setup
                             trans, epsil, lgamma, recover, where_rec, alpha_pv,&
                             nbnd_occ, flmixdpot, reduce_io, rec_code_read, &
                             done_epsil, zeu, done_zeu, current_iq, u_from_file
-  USE el_phon,       ONLY : elph
   USE output,        ONLY : fildrho
   USE modes,         ONLY : u, npertx, npert, gi, gimq, nirr, &
                             t, tmq, irotmq, minus_q, invsymq, &
                             nsymq, nmodes, rtau, name_rap_mode, num_rap_mode
-  USE dynmat,        ONLY : dyn, dyn_rec, dyn00
   USE efield_mod,    ONLY : epsilon, zstareu
   USE qpoint,        ONLY : xq
   USE partial,       ONLY : comp_irr, atomo, nat_todo, all_comp, &
@@ -362,40 +360,6 @@ subroutine phq_setup
   ENDIF
   num_rap_mode=-1
   IF (search_sym) CALL prepare_sym_analysis(nsymq,sr,t_rev,magnetic_sym)
-
-  IF (.NOT.u_from_file) THEN
-     CALL find_irrep()
-     CALL ph_writefile('data_u',0)
-  ENDIF
-  CALL find_irrep_sym()
-
-
-  IF (lgamma_gamma) THEN
-     ALLOCATE(has_equivalent(nat))
-     ALLOCATE(with_symmetry(3*nat))
-     ALLOCATE(n_equiv_atoms(nat))
-     ALLOCATE(equiv_atoms(nat,nat))
-     CALL find_equiv_sites (nat,nat,nsym,irt,has_equivalent,n_diff_sites, &
-                       n_equiv_atoms,equiv_atoms)
-
-     IF (n_diff_sites .LE. 0 .OR. n_diff_sites .GT. nat)            &
-          &      CALL errore('phq_setup','problem with n_diff_sites',1)
-     !
-     ! look if ASR can be exploited to reduce the number of calculations
-     ! we need to locate an independent atom with no equivalent atoms
-     nasr=0
-     IF (asr.AND.n_diff_sites.GT.1) THEN
-        DO na = 1, n_diff_sites
-           IF (n_equiv_atoms(na).EQ.1 ) THEN
-              nasr = equiv_atoms(na, 1)
-              GO TO 1
-           END IF
-        END DO
- 1      CONTINUE
-     END IF
-  END IF
-
-
   if (fildrho.ne.' '.and.ionode) call io_pattern (nat,fildrho,nirr,npert,u,xq,tmp_dir,+1)
 
   if (start_irr < 0) call errore('phq_setup', 'wrong start_irr', 1)
@@ -554,9 +518,6 @@ subroutine phq_setup
 !
 !  set to zero the variable written on file
 !
-  dyn=(0.0_DP,0.0_DP)
-  dyn00=(0.0_DP,0.0_DP)
-  dyn_rec=(0.0_DP,0.0_DP)
   IF (epsil.and..not.done_epsil) epsilon=0.0_DP
   IF (zeu.and..not.done_zeu) zstareu=0.0_DP
   IF (lraman.and..not.done_lraman) ramtns=0.0_DP

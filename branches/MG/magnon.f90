@@ -6,22 +6,15 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 !-----------------------------------------------------------------------
-PROGRAM phonon
+PROGRAM magnon
   !-----------------------------------------------------------------------
-
-  !!!! KUN AND HENRY's MAGNON CODE !!!
-  !!!! Small Change !!!
-
-  !
   ! ... This is the main driver of the phonon code.
   ! ... It reads all the quantities calculated by pwscf, it
   ! ... checks if some recover file is present and determines
   ! ... which calculation needs to be done. Finally, it makes
   ! ... a loop over the q points. At a generic q, if necessary it
   ! ... recalculates the band structure calling pwscf again.
-  ! ... Then it can calculate the response to an atomic displacement,
-  ! ... the dynamical matrix at that q, and the electron-phonon
-  ! ... interaction at that q. At q=0 it can calculate the linear response
+  !     At q=0 it can calculate the linear response
   ! ... to an electric field perturbation and hence the dielectric
   ! ... constant, the Born effective charges and the polarizability
   ! ... at imaginary frequencies.
@@ -50,13 +43,12 @@ PROGRAM phonon
   ! [6] [5] + constraints on the magnetization
   ! [7] [6] + Hubbard U
   ! [8] [7] + Hybrid functionals
-  ! [9] ? + External Electric field
-  ! [10] ? + nonperiodic boundary conditions.
+  ! [9]  ?  + External Electric field
+  ! [10] ?  + nonperiodic boundary conditions.
 
   USE io_global,       ONLY : stdout
   USE disp,            ONLY : nqs
   USE control_ph,      ONLY : epsil, trans, bands_computed
-  USE el_phon,         ONLY : elph, elph_mat, elph_simple
   USE output,          ONLY : fildrho
   USE check_stop,      ONLY : check_stop_init
   USE ph_restart,      ONLY : ph_writefile, destroy_status_run
@@ -70,7 +62,7 @@ PROGRAM phonon
   !
   INTEGER :: iq
   LOGICAL :: do_band, do_iq, setup_pw
-  CHARACTER (LEN=9)   :: code = 'PHONON'
+  CHARACTER (LEN=9)   :: code = 'MAGNON'
   CHARACTER (LEN=256) :: auxdyn
   !
   ! Initialize MPI, clocks, print initial messages
@@ -85,7 +77,9 @@ PROGRAM phonon
   !
   ! ... and begin with the initialization part
   !
+  WRITE(stdout, '(/5x, "Reading variables")') 
   CALL phq_readin()
+  WRITE(stdout, '(/5x, "Finished reading variables")') 
   !
   CALL check_stop_init()
   !
@@ -96,11 +90,7 @@ PROGRAM phonon
   !
   DO iq = 1, nqs
      !
-     CALL prepare_q(auxdyn, do_band, do_iq, setup_pw, iq)
-     !
-     !  If this q is not done in this run, cycle
-     !
-     IF (.NOT.do_iq) CYCLE
+     CALL prepare_q(do_band, do_iq, setup_pw, iq)
      !
      !  If necessary the bands are recalculated
      !
@@ -113,17 +103,8 @@ PROGRAM phonon
      !
      !  phonon perturbation
      !
-     !
      CALL phqscf()
-!HL more phonon stuff.
-     !CALL dynmatrix_new(iq)
-     !
-     !call rotate_dvscf_star(iq)
-     !
-     ! ... cleanup of the variables for the next q point
-     !
      CALL clean_pw_ph(iq)
-     !
   END DO
 
   CALL ph_writefile('init',0)
@@ -137,4 +118,4 @@ PROGRAM phonon
   !
   STOP
   !
-END PROGRAM phonon
+END PROGRAM magnon
