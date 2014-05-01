@@ -57,7 +57,6 @@ SUBROUTINE phq_readin()
                             get_ntask_groups, ntask_groups_file,  &
                             nbgrp
   USE paw_variables, ONLY : okpaw
-  USE ramanm,        ONLY : eth_rps, eth_ns, lraman, elop, dek
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
   USE ph_restart,    ONLY : ph_readfile
   USE xml_io_base,   ONLY : create_directory
@@ -91,8 +90,7 @@ SUBROUTINE phq_readin()
                        nat_todo, iverbosity, outdir, epsil,  &
                        trans,  zue, zeu, max_seconds, reduce_io, &
                        modenum, prefix, fildyn, fildvscf, fildrho, &
-                       ldisp, nq1, nq2, nq3, &
-                       eth_rps, eth_ns, lraman, elop, dek, recover,  &
+                       ldisp, nq1, nq2, nq3, recover,  &
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
@@ -112,7 +110,6 @@ SUBROUTINE phq_readin()
   ! zue          : if .true. calculate effective charges ( d force / dE )
   ! zeu          : if .true. calculate effective charges ( d P / du )
   ! lraman       : if true calculate raman tensor
-  ! elop         : if true calculate electro-optic tensor
   ! max_seconds  : maximum cputime for this run
   ! reduce_io    : reduce I/O to the strict minimum
   ! modenum      : single mode calculation
@@ -174,8 +171,6 @@ SUBROUTINE phq_readin()
   ! ... set default values for variables in namelist
   !
   tr2_ph       = 1.D-12
-  eth_rps      = 1.D-9
-  eth_ns       = 1.D-12
   amass(:)     = 0.D0
   alpha_mix(:) = 0.D0
   alpha_mix(1) = 0.7D0
@@ -192,8 +187,6 @@ SUBROUTINE phq_readin()
   zue          = .FALSE.
   fpol         = .FALSE.
   electron_phonon=' '
-  lraman       = .FALSE.
-  elop         = .FALSE.
   max_seconds  =  1.E+7_DP
   reduce_io    = .FALSE.
   CALL get_env( 'ESPRESSO_TMPDIR', outdir )
@@ -206,7 +199,6 @@ SUBROUTINE phq_readin()
   nq1          = 0
   nq2          = 0
   nq3          = 0
-  dek          = 1.0d-3
   nogg         = .FALSE.
   recover      = .FALSE.
   asr          = .FALSE.
@@ -261,8 +253,6 @@ SUBROUTINE phq_readin()
   ! ... Check all namelist variables
   !
   IF (tr2_ph <= 0.D0) CALL errore (' phq_readin', ' Wrong tr2_ph ', 1)
-  IF (eth_rps<= 0.D0) CALL errore ( 'phq_readin', ' Wrong eth_rps', 1)
-  IF (eth_ns <= 0.D0) CALL errore ( 'phq_readin', ' Wrong eth_ns ', 1)
 
   DO iter = 1, maxter
      IF (alpha_mix (iter) .LT.0.D0.OR.alpha_mix (iter) .GT.1.D0) CALL &
@@ -278,17 +268,11 @@ SUBROUTINE phq_readin()
   IF (max_seconds.LT.0.1D0) CALL errore ('phq_readin', ' Wrong max_seconds', 1)
 
   IF (modenum < 0) CALL errore ('phq_readin', ' Wrong modenum ', 1)
-  IF (dek <= 0.d0) CALL errore ( 'phq_readin', ' Wrong dek ', 1)
-
-  epsil = epsil .OR. lraman .OR. elop
-
   IF (modenum /= 0) search_sym=.FALSE.
   
   trans = trans .OR. ldisp
    
   !
-  ! Set default value for fildrho and fildvscf if they are required
-  IF ( (lraman.OR.elop.OR.drho_star%open) .AND. fildrho == ' ') fildrho = 'drho'
   !
   !  We can calculate  dielectric, raman or elop tensors and no Born effective
   !  charges dF/dE, but we cannot calculate Born effective charges dF/dE
@@ -315,11 +299,6 @@ SUBROUTINE phq_readin()
 
   IF (trans.AND.(lrpa.OR.lnoloc)) CALL errore('phq_readin', &
                     'only dielectric constant with lrpa or lnoloc',1)
-  IF (lrpa.or.lnoloc) THEN
-     zeu=.FALSE.
-     lraman=.FALSE.
-     elop = .FALSE.
-  ENDIF
   !
   ! reads the frequencies ( just if fpol = .true. )
   !
@@ -411,17 +390,8 @@ SUBROUTINE phq_readin()
   IF (lda_plus_u) CALL errore('phq_readin',&
      'The phonon code with LDA+U is not yet available',1)
 
-  IF (okpaw.and.(lraman.or.elop)) CALL errore('phq_readin',&
-     'The phonon code with paw and raman or elop is not yet available',1)
-
   IF (okpaw.and.noncolin.and.domag) CALL errore('phq_readin',&
      'The phonon code with paw and domag is not available yet',1)
-
-  IF (okvan.and.(lraman.or.elop)) CALL errore('phq_readin',&
-     'The phonon code with US-PP and raman or elop not yet available',1)
-
-  IF (noncolin.and.(lraman.or.elop)) CALL errore('phq_readin', &
-      'lraman, elop, and noncolin not programed',1)
 
   IF (lmovecell) CALL errore('phq_readin', &
       'The phonon code is not working after vc-relax',1)
@@ -530,8 +500,6 @@ SUBROUTINE phq_readin()
      nat_todo = 0
   ENDIF
 
-  IF (modenum > 0 .OR. lraman ) lgamma_gamma=.FALSE.
-  IF (.NOT.lgamma_gamma) asr=.FALSE.
   !
   IF (ldisp .AND. (nq1 .LE. 0 .OR. nq2 .LE. 0 .OR. nq3 .LE. 0)) &
        CALL errore('phq_readin','nq1, nq2, and nq3 must be greater than 0',1)

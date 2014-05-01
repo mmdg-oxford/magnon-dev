@@ -92,7 +92,6 @@ subroutine phq_recover
                             zeu, done_epsil, done_zeu, ext_recover, recover
   USE partial,       ONLY : comp_irr, done_irr
   USE modes,         ONLY : nirr
-  USE ramanm,        ONLY : lraman, elop, done_lraman, done_elop
 
   !
   implicit none
@@ -138,8 +137,6 @@ subroutine phq_recover
   IF (rec_code_read < 2) THEN
      IF (epsil.AND..NOT.done_epsil) all_done=.FALSE.
      IF (zeu.AND..NOT.done_zeu) all_done=.FALSE.
-     IF (lraman.AND..NOT.done_lraman) all_done=.FALSE.
-     IF (elop.AND..NOT.done_elop) all_done=.FALSE.
   END IF
 
   RETURN

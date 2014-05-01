@@ -91,13 +91,9 @@ subroutine phq_setup
   USE control_flags, ONLY : iverbosity, modenum, noinv
   USE disp,          ONLY : comp_irr_iq
   USE funct,         ONLY : dmxc, dmxc_spin, dmxc_nc, dft_is_gradient
-  USE ramanm,        ONLY : lraman, elop, ramtns, eloptns, done_lraman, &
-                            done_elop
-
   USE mp,            ONLY : mp_max, mp_min
   USE mp_global,     ONLY : inter_pool_comm, nimage
   !
-  USE acfdtest,      ONLY : acfdt_is_active, acfdt_num_der
 
   implicit none
 
@@ -127,8 +123,8 @@ subroutine phq_setup
   call start_clock ('phq_setup')
   ! 0) A few checks
   !
-  IF (dft_is_gradient().and.(lraman.or.elop)) call errore('phq_setup', &
-     'third order derivatives not implemented with GGA', 1)
+  !IF (dft_is_gradient().and.(lraman.or.elop)) call errore('phq_setup', &
+  !   'third order derivatives not implemented with GGA', 1)
   !
   !  read the displacement patterns
   !
@@ -139,16 +135,7 @@ subroutine phq_setup
   !
   ! 1) Computes the total local potential (external+scf) on the smooth grid
   !
-!!!!!!!!!!!!!!!!!!!!!!!! ACFDT TEST !!!!!!!!!!!!!!!!
-  IF (acfdt_is_active) THEN
-     ! discard set_vrs for numerical derivatives
-     if (.not.acfdt_num_der) then 
-        call set_vrs (vrs, vltot, v%of_r, kedtau, v%kin_r, dfftp%nnr, nspin, doublegrid)
-     end if
-  ELSE
      call set_vrs (vrs, vltot, v%of_r, kedtau, v%kin_r, dfftp%nnr, nspin, doublegrid)
-  ENDIF
-!!!!!!!!!!!!!!!!!!!!!!!!END OF  ACFDT TEST !!!!!!!!!!!!!!!!
   !
   ! 2) Set non linear core correction stuff
   !
@@ -518,11 +505,6 @@ subroutine phq_setup
 !
 !  set to zero the variable written on file
 !
-  IF (epsil.and..not.done_epsil) epsilon=0.0_DP
-  IF (zeu.and..not.done_zeu) zstareu=0.0_DP
-  IF (lraman.and..not.done_lraman) ramtns=0.0_DP
-  IF (elop.and..not.done_elop)  eloptns=0.0_DP
-
   where_rec='phq_setup.'
   rec_code=-40
   CALL ph_writefile('data',0)

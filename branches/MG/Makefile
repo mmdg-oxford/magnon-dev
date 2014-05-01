@@ -7,9 +7,7 @@ MODFLAGS= $(MOD_FLAG)../../iotk/src $(MOD_FLAG)../../Modules \
           $(MOD_FLAG)../../PW/src $(MOD_FLAG).
 
 MAGOBJS = \
-acfdtest.o \
 add_dkmds.o \
-add_for_charges.o \
 addcore.o \
 adddvepsi_us.o \
 adddvscf.o \
@@ -62,8 +60,6 @@ dvkb3.o \
 dvpsi_e.o \
 dvqpsi_mag_us.o \
 ef_shift.o \
-generate_dynamical_matrix_c.o \
-generate_effective_charges_c.o \
 gmressolve_all.o \
 h_psiq.o \
 incdrhoscf.o \
@@ -81,7 +77,6 @@ newdq.o \
 openfilq.o \
 orthogonalize.o \
 phcom.o \
-phescf.o \
 phq_init.o \
 phq_readin.o \
 phq_recover.o \
@@ -137,20 +132,9 @@ write_rec.o
 RAMANOBJS =    \
 cft_wave.o \
 psyme2.o   \
-chi_test.o \
-dielec_test.o \
-dvpsi_e2.o \
-el_opt.o   \
-hdiag.o    \
 pcgreen.o  \
-ramanm.o   \
-syme2.o    \
-solve_e2.o \
 solve_e_nscf.o \
 d2mxc.o    \
-raman_mat.o\
-raman.o    \
-dhdrhopsi.o\
 set_dvscf.o
 
 PHAUXOBJS = \

@@ -38,8 +38,6 @@ SUBROUTINE openfilq()
   USE control_flags,   ONLY : twfcollect
   USE mp_global,       ONLY : me_pool
   USE io_global,       ONLY : ionode,stdout
-  USE ramanm,          ONLY : lraman, elop, iuchf, iud2w, iuba2, lrchf, lrd2w, lrba2
-  USE acfdtest,        ONLY : acfdt_is_active, acfdt_num_der
   USE input_parameters,ONLY : nk1, nk2, nk3
   USE dfile_star,      ONLY : dvscf_star
   USE dfile_autoname,  ONLY : dfile_name
@@ -67,15 +65,8 @@ SUBROUTINE openfilq()
   !
   tmp_dir=tmp_dir_phq
  !!!!!!!!!!!!!!!!!!!!!!!! ACFDT TEST !!!!!!!!!!!!!!!!
-  IF (acfdt_is_active) THEN
-     ! ACFDT -test always the wfc is read/written from/to file in tmp_dir_phq
-     IF (.not.acfdt_num_der)  then 
-        IF (lgamma.AND.modenum==0) tmp_dir=tmp_dir_save
-     ENDIF
-  ELSE  
      ! this is the standard treatment
-     IF (lgamma.AND.modenum==0.AND.nk1.eq.0.AND.nk2.eq.0.AND.nk3.eq.0) tmp_dir=tmp_dir_save
-  ENDIF
+  IF (lgamma.AND.modenum==0.AND.nk1.eq.0.AND.nk2.eq.0.AND.nk3.eq.0) tmp_dir=tmp_dir_save
 !!!!!!!!!!!!!!!!!!!!!!!! END OF ACFDT TEST !!!!!!!!!!!!!!!!
   iuwfc = 20
   lrwfc = 2 * nbnd * npwx * npol

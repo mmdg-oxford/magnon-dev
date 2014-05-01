@@ -28,7 +28,6 @@ subroutine bcast_ph_input ( )
   USE output, ONLY : fildvscf, fildyn, fildrho
   use io_files, ONLY : tmp_dir, prefix
   USE control_flags, only: iverbosity, modenum
-  USE ramanm, ONLY: lraman, elop, dek, eth_rps, eth_ns
   USE input_parameters, ONLY: max_seconds
   USE input_parameters, ONLY : nk1, nk2, nk3, k1, k2, k3
   USE ions_base,     ONLY : amass
@@ -45,7 +44,6 @@ subroutine bcast_ph_input ( )
   call mp_bcast (zeu, ionode_id )
   call mp_bcast (reduce_io, ionode_id )
   call mp_bcast (ldisp, ionode_id )
-  call mp_bcast (lraman, ionode_id )
   call mp_bcast (fpol, ionode_id )
   call mp_bcast (recover, ionode_id )
   call mp_bcast (asr, ionode_id )
@@ -80,12 +78,9 @@ subroutine bcast_ph_input ( )
   ! real*8
   !
   call mp_bcast (tr2_ph, ionode_id )
-  call mp_bcast (eth_rps, ionode_id )
-  call mp_bcast (eth_ns, ionode_id )
   call mp_bcast (amass, ionode_id )
   call mp_bcast (alpha_mix, ionode_id )
   call mp_bcast (max_seconds, ionode_id )
-  call mp_bcast (dek, ionode_id )
   !
   ! characters
   !

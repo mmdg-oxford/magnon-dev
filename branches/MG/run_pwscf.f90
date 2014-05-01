@@ -23,7 +23,6 @@ SUBROUTINE run_pwscf(do_band)
                               ext_restart, bands_computed, newgrid
   USE save_ph,         ONLY : tmp_dir_save
   !
-  USE acfdtest,      ONLY : acfdt_is_active, acfdt_num_der, ir_point, delta_vrs
   USE scf,           ONLY : vrs
 
  !
@@ -56,10 +55,10 @@ SUBROUTINE run_pwscf(do_band)
   CALL setup_nscf ( newgrid, xq )
   CALL init_run()
 !!!!!!!!!!!!!!!!!!!!!!!! ACFDT TEST !!!!!!!!!!!!!!!!
-  IF (acfdt_is_active) THEN
-    ! ACFDT mumerical derivative test: modify the potential
-    IF (acfdt_num_der) vrs(ir_point,1)=vrs(ir_point,1) + delta_vrs
-  ENDIF
+ ! IF (acfdt_is_active) THEN
+ !   ! ACFDT mumerical derivative test: modify the potential
+ !   IF (acfdt_num_der) vrs(ir_point,1)=vrs(ir_point,1) + delta_vrs
+ ! ENDIF
 !!!!!!!!!!!!!!!!!!!!!!!!END OF ACFDT TEST !!!!!!!!!!!!!!!!
 !
   IF (do_band) CALL electrons()

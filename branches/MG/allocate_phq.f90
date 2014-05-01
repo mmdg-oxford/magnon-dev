@@ -28,7 +28,6 @@ subroutine allocate_phq
   USE uspp, ONLY: okvan, nkb
   USE paw_variables, ONLY : okpaw
   USE uspp_param, ONLY: nhm
-  USE ramanm, ONLY: ramtns, lraman
 
   USE qpoint, ONLY : nksq, eigqts, igkq
   USE phus, ONLY : int1, int1_nc, int2, int2_so, int3, int3_nc, int3_paw, &
