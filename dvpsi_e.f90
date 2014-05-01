@@ -28,7 +28,6 @@ subroutine dvpsi_e (ik, ipol)
                               allocate_bec_type, deallocate_bec_type
   USE uspp,            ONLY : okvan, nkb, vkb
   USE uspp_param,      ONLY : nh, nhm
-  USE ramanm,          ONLY : eth_rps
   USE eqv,             ONLY : dpsi, dvpsi, eprec
   USE phus,            ONLY : becp1
   USE qpoint,          ONLY : nksq, npwq
@@ -103,7 +102,8 @@ subroutine dvpsi_e (ik, ipol)
   !
   dvpsi(:,:) = (0.d0, 0.d0)
   !
-  thresh = eth_rps
+!HL
+  thresh = 0.00001
   call cgsolve_all (ch_psi_all, cg_psi, et (1, ik), dpsi, dvpsi, &
        h_diag, npwx, npw, thresh, ik, lter, conv_root, anorm, &
        nbnd_occ (ik), npol)

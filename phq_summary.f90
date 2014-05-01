@@ -39,7 +39,6 @@ subroutine phq_summary
   USE modes,         ONLY : u, npert, irotmq, minus_q, nsymq, nirr, &
                             name_rap_mode
   USE qpoint,        ONLY : xq
-  USE ramanm,        ONLY : lraman, elop
   USE control_flags, ONLY : iverbosity
   USE wvfct,         ONLY : ecutwfc
 
@@ -258,10 +257,6 @@ subroutine phq_summary
      ELSEIF (zeu) THEN
              WRITE( stdout, '(5x,"Born effective charges as d Force / d E")')
      END IF
-     IF (lraman) &
-          WRITE( stdout, '(5x,"Raman tensor")')
-     IF (elop) &
-          WRITE( stdout, '(5x,"Electro-optic tensor")')
      IF (fpol)  THEN
         WRITE( stdout, '(5x,"Frequency Dependent Polarizability at (Ry) ")' )
         WRITE( stdout, '(5x,8(f9.4,"i"))') (fiu(iu), iu=nfs,1,-1)

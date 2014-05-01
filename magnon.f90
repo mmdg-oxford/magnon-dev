@@ -104,6 +104,8 @@ PROGRAM magnon
      !  phonon perturbation
      !
      CALL phqscf()
+    !might be better
+    !CALL phescf()
      CALL clean_pw_ph(iq)
   END DO
 

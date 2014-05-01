@@ -58,7 +58,6 @@ SUBROUTINE phq_init()
 
   USE mp_global,           ONLY : intra_pool_comm
   USE mp,                  ONLY : mp_sum
-  USE acfdtest,            ONLY : acfdt_is_active, acfdt_num_der
   !
   IMPLICIT NONE
   !

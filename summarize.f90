@@ -134,34 +134,33 @@ SUBROUTINE summarize_zue
 END SUBROUTINE summarize_zue
 !
 !-----------------------------------------------------------------------
-SUBROUTINE summarize_elopt()
-  !-----------------------------------------------------------------------
-  !
-  ! write the electro-optic tensor on output
-  !
-  USE io_global,  ONLY : stdout
-  USE ramanm,     ONLY : eloptns, done_elop
-IMPLICIT NONE
-
-INTEGER :: ipa, ipb, ipc
-
-IF (.NOT. done_elop) RETURN
-
-WRITE(stdout, '(/,10x,''    Electro-optic tensor is defined as '')' )
-WRITE(stdout, '(10x  ,''  the derivative of the dielectric tensor '')' )
-WRITE(stdout, '(10x  ,''    with respect to one electric field '')' )
-WRITE(stdout, '(10x  ,''       units are Rydberg a.u. '',/)' )
-WRITE(stdout, '(10x  ,''  to obtain the static chi^2 multiply by 1/2  '',/)' )
-WRITE(stdout, '(10x  ,''  to convert to pm/Volt multiply per 2.7502  '',/)' )
-WRITE(stdout, '(/,10x,''Electro-optic tensor in cartesian axis: '',/)' )
-
-DO ipc = 1, 3
-   DO ipb = 1, 3
-      WRITE(stdout,'(10x,''('',3f18.9,'' )'')')      &
-                   (eloptns (ipa, ipb, ipc), ipa = 1, 3)
-   ENDDO
-   WRITE(6,'(10x)')
-ENDDO
-
-RETURN
-END SUBROUTINE summarize_elopt
+!SUBROUTINE summarize_elopt()
+!  !-----------------------------------------------------------------------
+!  !
+!  ! write the electro-optic tensor on output
+!  !
+!  USE io_global,  ONLY : stdout
+!IMPLICIT NONE
+!
+!INTEGER :: ipa, ipb, ipc
+!
+!IF (.NOT. done_elop) RETURN
+!
+!WRITE(stdout, '(/,10x,''    Electro-optic tensor is defined as '')' )
+!WRITE(stdout, '(10x  ,''  the derivative of the dielectric tensor '')' )
+!WRITE(stdout, '(10x  ,''    with respect to one electric field '')' )
+!WRITE(stdout, '(10x  ,''       units are Rydberg a.u. '',/)' )
+!WRITE(stdout, '(10x  ,''  to obtain the static chi^2 multiply by 1/2  '',/)' )
+!WRITE(stdout, '(10x  ,''  to convert to pm/Volt multiply per 2.7502  '',/)' )
+!WRITE(stdout, '(/,10x,''Electro-optic tensor in cartesian axis: '',/)' )
+!
+!DO ipc = 1, 3
+!   DO ipb = 1, 3
+!      WRITE(stdout,'(10x,''('',3f18.9,'' )'')')      &
+!                   (eloptns (ipa, ipb, ipc), ipa = 1, 3)
+!   ENDDO
+!   WRITE(6,'(10x)')
+!ENDDO
+!
+!RETURN
+!END SUBROUTINE summarize_elopt

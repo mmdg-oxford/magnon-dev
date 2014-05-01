@@ -25,7 +25,6 @@ SUBROUTINE phescf()
   USE ph_restart,      ONLY : ph_writefile
   USE phus,            ONLY : int3, int3_nc, int3_paw
   USE freq_ph
-  USE ramanm,          ONLY : ramtns, lraman, elop, done_lraman, done_elop
   !
   IMPLICIT NONE
   !
@@ -36,7 +35,6 @@ SUBROUTINE phescf()
      IF (done_epsil) call summarize_epsilon()
      IF (done_zeu) call summarize_zeu()
      IF (done_elop) call summarize_elopt()
-     IF (done_lraman) call write_ramtns(6,ramtns)
      RETURN
   ENDIF
   !
@@ -64,8 +62,7 @@ SUBROUTINE phescf()
      !
   ENDIF
   !
-  IF ((epsil.AND..NOT.done_epsil).OR.(zeu.AND..NOT.done_zeu).OR.  &
-      (lraman.AND..NOT.done_lraman).OR.(elop.AND..NOT.done_elop)) THEN
+  IF ((epsil.AND..NOT.done_epsil).OR.(zeu.AND..NOT.done_zeu) THEN
 
      WRITE( stdout, '(/,5X,"Electric Fields Calculation")' )
      !
@@ -100,8 +97,6 @@ SUBROUTINE phescf()
         !
      END IF
      !
-     IF ( (lraman.AND..NOT.done_lraman) .OR. (elop.AND..NOT.done_elop) &
-                  .AND..NOT.noncolin) CALL raman()
      !
      where_rec='after_diel'
      rec_code=2
@@ -110,7 +105,6 @@ SUBROUTINE phescf()
      IF (done_epsil) call summarize_epsilon()
      IF (done_zeu) call summarize_zeu()
      IF (done_elop) call summarize_elopt()
-     IF (done_lraman) call write_ramtns(6,ramtns)
   ENDIF
   !
   IF (okvan) THEN
