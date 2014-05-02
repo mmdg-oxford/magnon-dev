@@ -7,7 +7,7 @@
 !
 !
 !----------------------------------------------------------------------
-subroutine dvqpsi_us (dbext, ik, uact, addnlcc)
+subroutine dvqpsi_mag_us (ik, addnlcc)
   !----------------------------------------------------------------------
   !
   ! This routine applies the external magnetic field to 
@@ -44,6 +44,7 @@ subroutine dvqpsi_us (dbext, ik, uact, addnlcc)
   !
   !   And the local variables
   !
+  complex(DP), allocatable  :: psic (:,:)
 
   integer :: na, mu, ikk, ig, nt, ibnd, ir, is, ip
   ! counter on atoms
@@ -55,9 +56,8 @@ subroutine dvqpsi_us (dbext, ik, uact, addnlcc)
   ! counter on real mesh
 
   complex(DP) :: gtau, gu, fact, u1, u2, u3, gu0
-  complex(DP) :: dbext(dffts%nnr) 
   complex(DP) , allocatable, target :: aux (:)
-  complex(DP) , allocatable :: aux1 (:), aux2 (:)
+  complex(DP) , allocatable :: aux1 (:), aux2 (:,:)
   complex(DP) , pointer :: auxs (:)
   ! work space
 
@@ -71,7 +71,8 @@ subroutine dvqpsi_us (dbext, ik, uact, addnlcc)
      endif
   endif
   allocate (aux1(dffts%nnr))
-  allocate (aux2(dffts%nnr))
+  allocate (aux2(dffts%nnr, npol))
+  allocate (psic(dffts%nnr, npol))
   !
   !    We start by computing the contribution of the local potential.
   !    The computation of the derivative of the local potential is done in
@@ -80,62 +81,80 @@ subroutine dvqpsi_us (dbext, ik, uact, addnlcc)
   !
   ikk = ikks(ik)
   dvpsi(:,:) = (0.d0, 0.d0)
-  aux1(:) = (0.d0, 0.d0)
+  aux1(:)    = (0.d0, 0.d0)
+  aux2       = (0.d0, 0.d0)
 
-  aux1 (:) = dbext(:)
+  !in a.u. \mu_{B} = 1/2
+  ! \mu_{B} * FFT[B_{q}(G)]
+  !scalar component of field.
+  aux1 (nl(1)) = 0.5*1.0d0
 
+  !moved into real space:
+  CALL invfft ('Smooth', aux1, dffts)
   !
   ! add NLCC when present
   !
    if (nlcc_any.and.addnlcc) then
       WRITE(6,'("WARNING NLCC NOT IMPLEMENTED.")')
    endif
-  !
-  ! Now we compute dV_loc/dtau in real space
-  !
-  CALL invfft ('Smooth', aux1, dffts)
-  do ibnd = 1, nbnd
-     do ip=1,npol
-        aux2(:) = (0.d0, 0.d0)
-        if (ip==1) then
-           do ig = 1, npw
-              aux2 (nls (igk (ig) ) ) = evc (ig, ibnd)
-           enddo
-        else
-           do ig = 1, npw
-              aux2 (nls (igk (ig) ) ) = evc (ig+npwx, ibnd)
-           enddo
-        end if
-        !
-        !  This wavefunction is computed in real space
-        !
-        CALL invfft ('Wave', aux2, dffts)
+
+  do ibnd=1, nbnd
+    psic = (0.d0, 0.d0)
+    aux2 = (0.d0, 0.d0)
+
+    do ig = 1, npwq
+       psic (nls (igk (ig)), 1 ) = evc (ig, ibnd)
+       psic (nls (igk (ig)), 2 ) = evc (ig+npwx, ibnd)
+    enddo
+
+    CALL invfft ('Wave', psic(:,1), dffts)
+    CALL invfft ('Wave', psic(:,2), dffts)
+
+!HL initial test with B_{+-}
+!X: \mu_b \sigma_{x}B_{x}
         do ir = 1, dffts%nnr
-           aux2 (ir) = aux2 (ir) * aux1 (ir)
+           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
+           aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
         enddo
-        !
-        ! and finally dV_loc/dtau * psi is transformed in reciprocal space
-        !
-        CALL fwfft ('Wave', aux2, dffts)
+
+!Y: \mu_b \sigma_{y}B_{y}
+        do ir = 1, dffts%nnr
+           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
+           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
+        enddo
+
+!Z: \mu_b \sigma_{z}B_{z}
+!        do ir = 1, dffts%nnr
+!           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+!           aux2(ir,2) = aux2(ir,2) - aux1 (ir)*psic(ir,2)
+!        enddo
+
+      CALL fwfft ('Wave', aux2(:,1), dffts)
+      CALL fwfft ('Wave', aux2(:,2), dffts)
+!igkq pointing to wrong place!
+
+      do ip = 1, npol
         if (ip==1) then
            do ig = 1, npwq
-              dvpsi (ig, ibnd) = aux2 (nls (igkq (ig) ) )
+              dvpsi (ig, ibnd) = aux2 (nls (igkq (ig) ), 1)
            enddo
         else
            do ig = 1, npwq
-              dvpsi (ig+npwx, ibnd) = aux2 (nls (igkq (ig) ) )
+              dvpsi (ig+npwx, ibnd) = aux2 (nls (igkq (ig) ), 2)
            enddo
         end if
-     enddo
-  enddo
-  !
+      enddo!npol
+    enddo!nbnd
+!
   deallocate (aux2)
   deallocate (aux1)
   if (nlcc_any.and.addnlcc) then
      deallocate (aux)
      if (doublegrid) deallocate (auxs)
   endif
-
+  !
+  !HL additional term from contribution nonlocal potential
+  !call dvqpsi_us_only (ik, uact)
   call stop_clock ('dvqpsi_us')
   return
-end subroutine dvqpsi_us
+end subroutine dvqpsi_mag_us

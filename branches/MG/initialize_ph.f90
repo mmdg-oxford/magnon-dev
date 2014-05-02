@@ -56,7 +56,7 @@ SUBROUTINE initialize_ph()
   !
   !  Recover the status if available
   !
-  CALL phq_recover()
+  !  CALL phq_recover()
   !
   !  Output summary of the main variables of the phonon code
   !

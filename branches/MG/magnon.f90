@@ -101,10 +101,10 @@ PROGRAM magnon
      !
      CALL initialize_ph()
      !
-     !  phonon perturbation
+     !  magnon perturbation
      !
      CALL phqscf()
-    !might be better
+    !calculates dielectric tensor:
     !CALL phescf()
      CALL clean_pw_ph(iq)
   END DO

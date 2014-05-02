@@ -496,7 +496,9 @@ subroutine phq_setup
      IF (comp_irr(irr)==0) all_comp=.false.
   ENDDO
   all_comp = all_comp.OR.lgamma_gamma
+
   all_done = .FALSE.
+
   npertx = 0
   done_irr = 0
   DO irr = 1, nirr

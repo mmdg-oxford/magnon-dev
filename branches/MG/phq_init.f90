@@ -72,7 +72,7 @@ SUBROUTINE phq_init()
     ! index for wavefunctions at k
     ! counter on atoms
     ! counter on G vectors
-  INTEGER :: ikqg         !for the case elph_mat=.true.
+  INTEGER :: ikqg,ios         !for the case elph_mat=.true.
   REAL(DP) :: arg
     ! the argument of the phase
   COMPLEX(DP), ALLOCATABLE :: aux1(:,:)
@@ -81,6 +81,7 @@ SUBROUTINE phq_init()
 
   !
   !
+  all_done=.false.
   IF (all_done) RETURN
   !
   CALL start_clock( 'phq_init' )
@@ -176,22 +177,22 @@ SUBROUTINE phq_init()
      ! ... e') we compute the derivative of the becp term with respect to an
      !         atomic displacement
      !
-     DO ipol = 1, 3
-        aux1=(0.d0,0.d0)
-        DO ibnd = 1, nbnd
-           DO ig = 1, npw
-              aux1(ig,ibnd) = evc(ig,ibnd) * tpiba * ( 0.D0, 1.D0 ) * &
-                              ( xk(ipol,ikk) + g(ipol,igk(ig)) )
-           END DO
-           IF (noncolin) THEN
-              DO ig = 1, npw
-                 aux1(ig+npwx,ibnd)=evc(ig+npwx,ibnd)*tpiba*(0.D0,1.D0)*&
-                           ( xk(ipol,ikk) + g(ipol,igk(ig)) )
-              END DO
-           END IF
-        END DO
-        CALL calbec (npw, vkb, aux1, alphap(ipol,ik) )
-     END DO
+     !DO ipol = 1, 3
+     !   aux1=(0.d0,0.d0)
+     !   DO ibnd = 1, nbnd
+     !      DO ig = 1, npw
+     !         aux1(ig,ibnd) = evc(ig,ibnd) * tpiba * ( 0.D0, 1.D0 ) * &
+     !                         ( xk(ipol,ikk) + g(ipol,igk(ig)) )
+     !      END DO
+     !      IF (noncolin) THEN
+     !         DO ig = 1, npw
+     !            aux1(ig+npwx,ibnd)=evc(ig+npwx,ibnd)*tpiba*(0.D0,1.D0)*&
+     !                      ( xk(ipol,ikk) + g(ipol,igk(ig)) )
+     !         END DO
+     !      END IF
+     !   END DO
+     !   CALL calbec (npw, vkb, aux1, alphap(ipol,ik) )
+     !END DO
      !
      !
      ! this is the standard treatment
@@ -220,21 +221,30 @@ SUBROUTINE phq_init()
      END DO
      !
   END DO
+
+!HL TEST on iunigk
+!     IF ( nksq > 1 ) REWIND( iunigk )
+!     do ik = 1, nksq
+!        if (nksq.gt.1) then
+!           read (iunigk, err = 100, iostat = ios) npw, igk
+!100        call errore ('solve_linter', 'reading igk', abs (ios) )
+!            print*,igk
+!           read (iunigk, err = 200, iostat = ios) npwq, igkq
+!200        call errore ('solve_linter', 'reading igkq', abs (ios) )
+!        endif
+!      enddo
+!    STOP
+
+
+
+
 #ifdef __MPI
      CALL mp_sum ( eprec, intra_pool_comm )
 #endif
   !
   DEALLOCATE( aux1 )
-     
   !
   !
-  IF ( ( epsil .OR. zue ) .AND. okvan ) THEN
-     CALL compute_qdipol(dpqq)
-     IF (lspinorb) CALL compute_qdipol_so(dpqq, dpqq_so)
-     CALL qdipol_cryst()
-  END IF
-  !
-!  IF ( trans ) CALL dynmat0_new()
   !
   CALL stop_clock( 'phq_init' )
   !

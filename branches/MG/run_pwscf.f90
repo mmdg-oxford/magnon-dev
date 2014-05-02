@@ -54,13 +54,6 @@ SUBROUTINE run_pwscf(do_band)
   !
   CALL setup_nscf ( newgrid, xq )
   CALL init_run()
-!!!!!!!!!!!!!!!!!!!!!!!! ACFDT TEST !!!!!!!!!!!!!!!!
- ! IF (acfdt_is_active) THEN
- !   ! ACFDT mumerical derivative test: modify the potential
- !   IF (acfdt_num_der) vrs(ir_point,1)=vrs(ir_point,1) + delta_vrs
- ! ENDIF
-!!!!!!!!!!!!!!!!!!!!!!!!END OF ACFDT TEST !!!!!!!!!!!!!!!!
-!
   IF (do_band) CALL electrons()
   !
   IF (.NOT.reduce_io.and.do_band) THEN
@@ -69,8 +62,8 @@ SUBROUTINE run_pwscf(do_band)
      done_bands=.TRUE.
   ENDIF
   !
-  CALL seqopn( 4, 'restart', 'UNFORMATTED', exst )
-  CLOSE( UNIT = 4, STATUS = 'DELETE' )
+  !CALL seqopn( 4, 'restart', 'UNFORMATTED', exst )
+  !CLOSE( UNIT = 4, STATUS = 'DELETE' )
   ext_restart=.FALSE.
   !
   CALL close_files(.true.)

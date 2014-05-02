@@ -83,6 +83,7 @@ phq_recover.o \
 phq_setup.o \
 phq_summary.o \
 phqscf.o \
+phescf.o \
 ph_restart.o \
 polariz.o \
 print_clock_ph.o \
@@ -149,19 +150,14 @@ LIBOBJS	= ../../flib/ptools.a ../../flib/flib.a ../../clib/clib.a ../../iotk/src
 
 TLDEPS= bindir mods libs pw
 
-all : tldeps libs-ph ph.x
+all : tldeps libs-ph mag.x
 
 libs-ph : libph.a libphaux.a
 
-ph.x : magnon.o libph.a $(PWOBJS) $(LIBOBJS)
+mag.x : magnon.o libph.a $(PWOBJS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o $@ magnon.o libph.a \
 		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/ph.x . )
-
-fqha.x : fqha.o $(PWOBJS) $(QEMODS) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ fqha.o \
-                 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
-	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
+	- ( cd ../../bin ; ln -fs ../Magnon/MG/mag.x . )
 
 tldeps:
 	test -n "$(TLDEPS)" && ( cd ../.. ; $(MAKE) $(MFLAGS) $(TLDEPS) || exit 1) || :
@@ -176,7 +172,7 @@ libphaux.a : $(PHAUXOBJS)
 	
 clean :
 	- /bin/rm -f *.x *.o *.a *~ *.F90 *.d *.mod *.i *.L
-	- /bin/rm -rf ../../bin/ph.x ../../bin/dynmat.x ../../bin/matdyn.x 
+	- /bin/rm -rf ../../bin/mag.x
 
 include make.depend
 # DO NOT DELETE

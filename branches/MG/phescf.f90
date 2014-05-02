@@ -31,12 +31,6 @@ SUBROUTINE phescf()
   INTEGER :: iu
   !
   !
-  IF ( rec_code_read >  1 ) THEN
-     IF (done_epsil) call summarize_epsilon()
-     IF (done_zeu) call summarize_zeu()
-     IF (done_elop) call summarize_elopt()
-     RETURN
-  ENDIF
   !
   IF (okvan) THEN
      ALLOCATE (int3 ( nhm, nhm, 3, nat, nspin_mag))
@@ -62,7 +56,7 @@ SUBROUTINE phescf()
      !
   ENDIF
   !
-  IF ((epsil.AND..NOT.done_epsil).OR.(zeu.AND..NOT.done_zeu) THEN
+!  IF ((epsil.AND..NOT.done_epsil).OR.(zeu.AND..NOT.done_zeu) THEN
 
      WRITE( stdout, '(/,5X,"Electric Fields Calculation")' )
      !
@@ -80,17 +74,6 @@ SUBROUTINE phescf()
         ELSE
            CALL summarize_epsilon()
         ENDIF
-        !
-        ! ... calculate the effective charges Z(E,Us) (E=scf,Us=bare)
-        !
-        IF (.NOT.(lrpa.OR.lnoloc).AND.(zeu.AND..NOT.done_zeu)) THEN
-           CALL zstar_eu()
-        ELSEIF (done_zeu) THEN
-           CALL summarize_zeu()
-        ENDIF
-        !
-        IF ( fildrho /= ' ' ) CALL punch_plot_e()
-        !
      ELSE
         !
         CALL stop_ph( .FALSE. )
@@ -101,11 +84,10 @@ SUBROUTINE phescf()
      where_rec='after_diel'
      rec_code=2
      CALL ph_writefile('data',0)
-  ELSE
-     IF (done_epsil) call summarize_epsilon()
-     IF (done_zeu) call summarize_zeu()
-     IF (done_elop) call summarize_elopt()
-  ENDIF
+!  ELSE
+     !IF (done_epsil) call summarize_epsilon()
+     !IF (done_zeu) call summarize_zeu()
+!  ENDIF
   !
   IF (okvan) THEN
      DEALLOCATE (int3)
