@@ -53,25 +53,20 @@ SUBROUTINE phqscf
   ! the change of density due to perturbations
 
   CALL start_clock ('phqscf')
-  !
-  !    For each irreducible representation we compute the change
-  !    of the wavefunctions
-  !
-        ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag, npe))
+
+        ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag))
         imode0 = 0
         IF (okvan) THEN
-           ALLOCATE (int3 ( nhm, nhm, npe, nat, nspin_mag))
-           IF (okpaw) ALLOCATE (int3_paw (nhm, nhm, npe, nat, nspin_mag))
-           IF (noncolin) ALLOCATE(int3_nc( nhm, nhm, npe, nat, nspin))
+           print*, nhm, npe,nat,nspin_mag
+!          ALLOCATE (int3 ( nhm, nhm, npe, nat, nspin_mag))
+!           IF (okpaw) ALLOCATE (int3_paw (nhm, nhm, npe, nat, nspin_mag))
+!           IF (noncolin) ALLOCATE(int3_nc( nhm, nhm, npe, nat, nspin))
         ENDIF
 
-
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
-        CALL solve_linter (drhoscfs)
+        CALL solve_linter (drhoscfs(1,1))
         WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
-        !
-        !   Add the contribution of this mode to the dynamical matrix
-        !
+
         IF (okvan) THEN
            DEALLOCATE (int3)
            IF (okpaw) DEALLOCATE (int3_paw)

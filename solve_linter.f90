@@ -7,7 +7,7 @@
 !
 !
 !-----------------------------------------------------------------------
-SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
+SUBROUTINE solve_linter (drhoscf)
   !-----------------------------------------------------------------------
   !
   !    Driver routine for the solution of the linear system which
@@ -36,7 +36,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   USE fft_base,             ONLY : dfftp, dffts
   USE lsda_mod,             ONLY : lsda, nspin, current_spin, isk
   USE spin_orb,             ONLY : domag
-  USE wvfct,                ONLY : nbnd, npw, npwx, igk,g2kin,  et
+  USE wvfct,                ONLY : nbnd, npw, npwx, igk, g2kin, et
   USE scf,                  ONLY : rho
   USE uspp,                 ONLY : okvan, vkb
   USE uspp_param,           ONLY : upf, nhm, nh
@@ -73,7 +73,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   ! input: the number of perturbation
   ! input: the position of the modes
 
-  complex(DP) :: drhoscf (dfftp%nnr, nspin_mag, npe)
+  complex(DP) :: drhoscf (dfftp%nnr, nspin_mag)
   ! output: the change of the scf charge
 
   real(DP) , allocatable :: h_diag (:,:)
@@ -89,11 +89,11 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   real(DP), external :: w0gauss, wgauss
   ! functions computing the delta and theta function
 
-  complex(DP), allocatable, target :: dvscfin(:,:,:)
+  complex(DP), allocatable, target :: dvscfin(:,:)
   ! change of the scf potential
-  complex(DP), pointer :: dvscfins (:,:,:)
+  complex(DP), pointer :: dvscfins (:,:)
   ! change of the scf potential (smooth part only)
-  complex(DP), allocatable :: drhoscfh (:,:,:), dvscfout (:,:,:)
+  complex(DP), allocatable :: drhoscfh (:,:), dvscfout (:,:)
   ! change of rho / scf potential (output)
   ! change of scf potential (output)
   complex(DP), allocatable :: ldos (:,:), ldoss (:,:), mixin(:), mixout(:), &
@@ -135,22 +135,33 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   !
   IF (rec_code_read > 20 ) RETURN
 
+  npe    = 1
+  imode0 = 1
+  irr    = 1
+  ipert  = 1
+  lter   = 0
+
   call start_clock ('solve_linter')
-  allocate (dvscfin ( dfftp%nnr , nspin_mag , npe))
+
+  allocate (dvscfin ( dfftp%nnr , nspin_mag))
   if (doublegrid) then
-     allocate (dvscfins (dffts%nnr , nspin_mag , npe))
+     allocate (dvscfins (dffts%nnr , nspin_mag))
   else
      dvscfins => dvscfin
   endif
-  allocate (drhoscfh ( dfftp%nnr, nspin_mag , npe))
-  allocate (dvscfout ( dfftp%nnr, nspin_mag , npe))
-  allocate (dbecsum ( (nhm * (nhm + 1))/2 , nat , nspin_mag , npe))
+  allocate (drhoscfh ( dfftp%nnr, nspin_mag))
+  allocate (dvscfout ( dfftp%nnr, nspin_mag ))
+  allocate (dbecsum ( (nhm * (nhm + 1))/2 , nat , nspin_mag, npe))
+
+
   IF (okpaw) THEN
-     allocate (mixin(dfftp%nnr*nspin_mag*npe+(nhm*(nhm+1)*nat*nspin_mag*npe)/2) )
-     allocate (mixout(dfftp%nnr*nspin_mag*npe+(nhm*(nhm+1)*nat*nspin_mag*npe)/2) )
+     allocate (mixin(dfftp%nnr*nspin_mag+(nhm*(nhm+1)*nat*nspin_mag)/2) )
+     allocate (mixout(dfftp%nnr*nspin_mag+(nhm*(nhm+1)*nat*nspin_mag)/2) )
      mixin=(0.0_DP,0.0_DP)
   ENDIF
-  IF (noncolin) allocate (dbecsum_nc (nhm,nhm, nat , nspin , npe))
+
+
+  IF (noncolin) allocate (dbecsum_nc (nhm,nhm, nat , nspin, npe))
   allocate (aux1 ( dffts%nnr, npol))
   allocate (h_diag ( npwx*npol, nbnd))
   !
@@ -161,8 +172,8 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
         IF (convt) THEN
            CALL PAW_dpotential(dbecsum,rho%bec,int3_paw,npe)
         ELSE
-           CALL setmixout(npe*dfftp%nnr*nspin_mag,&
-           (nhm*(nhm+1)*nat*nspin_mag*npe)/2,mixin,dvscfin,dbecsum,ndim,-1)
+           CALL setmixout(dfftp%nnr*nspin_mag,&
+           (nhm*(nhm+1)*nat*nspin_mag)/2,mixin,dvscfin,dbecsum,ndim,-1)
         ENDIF
      ELSE
         CALL read_rec(dr2, iter0, npe, dvscfin, dvscfins, drhoscfh)
@@ -214,16 +225,19 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      ltaver = 0
 
      lintercall = 0
-     drhoscf(:,:,:) = (0.d0, 0.d0)
+     drhoscf(:,:) = (0.d0, 0.d0)
      dbecsum(:,:,:,:) = (0.d0, 0.d0)
      IF (noncolin) dbecsum_nc = (0.d0, 0.d0)
      !
      if (nksq.gt.1) rewind (unit = iunigk)
+
      do ik = 1, nksq
+
         if (nksq.gt.1) then
            read (iunigk, err = 100, iostat = ios) npw, igk
 100        call errore ('solve_linter', 'reading igk', abs (ios) )
         endif
+
         if (lgamma)  npwq = npw
         ikk = ikks(ik)
         ikq = ikqs(ik)
@@ -233,6 +247,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
 200        call errore ('solve_linter', 'reading igkq', abs (ios) )
 
         endif
+
         call init_us_2 (npwq, igkq, xk (1, ikq), vkb)
         !
         ! reads unperturbed wavefuctions psi(k) and psi(k+q)
@@ -269,9 +284,8 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
         !
         ! diagonal elements of the unperturbed hamiltonian
         !
-        do ipert = 1, npe
-           mode = imode0 + ipert
-           nrec = (ipert - 1) * nksq + ik
+           mode =1
+           nrec = ik
            !
            !  and now adds the contribution of the self consistent term
            !
@@ -287,7 +301,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
               call start_clock ('vpsifft')
               do ibnd = 1, nbnd_occ (ikk)
                  call cft_wave (evc (1, ibnd), aux1, +1)
-                 call apply_dpot(dffts%nnr,aux1, dvscfins(1,1,ipert), current_spin)
+                 call apply_dpot(dffts%nnr, aux1, dvscfins(1,1), current_spin)
                  call cft_wave (dvpsi (1, ibnd), aux1, -1)
               enddo
               call stop_clock ('vpsifft')
@@ -296,14 +310,17 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
               !  selfconsist term which comes from the dependence of D on
               !  V_{eff} on the bare change of the potential
               !
-              call adddvscf (ipert, ik)
+              !Need to check this for ultrasoft
+              !HL THIS TERM PROBABLY NEEDS TO BE INCLUDED.
+              !call adddvscf (ipert, ik)
            else
               !
               !  At the first iteration dvbare_q*psi_kpoint is calculated
               !  and written to file
               !
-              call dvqpsi_us (ik, u (1, mode),.false. )
-              call davcio (dvpsi, lrbar, iubar, nrec, 1)
+              !call dvqpsi_us (ik, u (1, mode),.false. )
+               call dvqpsi_mag_us (ik, .false.)
+               call davcio (dvpsi, lrbar, iubar, nrec, 1)
            endif
            !
            ! Ortogonalize dvpsi to valence states: ps = <evq|dvpsi>
@@ -316,6 +333,11 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
               ! starting value for delta_psi is read from iudwf
               !
               call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
+
+!For frequency dependent case we will require two more wave functions
+!              call davcio ( dpsip, lrdwf, iudwfp, nrec1, -1)
+!              call davcio ( dpsim, lrdwf, iudwfm, nrec1, -1)
+
               !
               ! threshold for iterative solution of the linear system
               !
@@ -325,7 +347,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
               !  At the first iteration dpsi and dvscfin are set to zero
               !
               dpsi(:,:) = (0.d0, 0.d0)
-              dvscfin (:, :, ipert) = (0.d0, 0.d0)
+              dvscfin (:, :) = (0.d0, 0.d0)
               !
               ! starting threshold for iterative solution of the linear system
               !
@@ -357,14 +379,12 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
            !
            weight = wk (ikk)
            IF (noncolin) THEN
-              call incdrhoscf_nc(drhoscf(1,1,ipert),weight,ik, &
-                                 dbecsum_nc(1,1,1,1,ipert), dpsi)
+              call incdrhoscf_nc(drhoscf(1,1),weight,ik, &
+                                 dbecsum_nc(1,1,1,1,1), dpsi)
            ELSE
-              call incdrhoscf (drhoscf(1,current_spin,ipert), weight, ik, &
+              call incdrhoscf (drhoscf(1,current_spin), weight, ik, &
                             dbecsum(1,1,current_spin,ipert), dpsi)
            END IF
-           ! on perturbations
-        enddo
         ! on k-points
      enddo
 #ifdef __MPI
@@ -382,16 +402,17 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      if (doublegrid) then
         do is = 1, nspin_mag
            do ipert = 1, npe
-              call cinterpolate (drhoscfh(1,is,ipert), drhoscf(1,is,ipert), 1)
+              call cinterpolate (drhoscfh(1,is), drhoscf(1,is), 1)
            enddo
         enddo
      else
-        call zcopy (npe*nspin_mag*dfftp%nnr, drhoscf, 1, drhoscfh, 1)
+        call zcopy (nspin_mag*dfftp%nnr, drhoscf, 1, drhoscfh, 1)
      endif
      !
      !  In the noncolinear, spin-orbit case rotate dbecsum
      !
-     !IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum, npe)
+     !HL might also need this in set_int12
+     !IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum)
      !
      !    Now we compute for all perturbations the total charge and potential
      !
@@ -447,12 +468,12 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      !
      do ipert = 1, npe
         if (fildrho.ne.' ') then 
-           call davcio_drho (drhoscfh(1,1,ipert), lrdrho, iudrho, imode0+ipert, +1)
+           call davcio_drho (drhoscfh(1,1), lrdrho, iudrho, imode0+ipert, +1)
 !           close(iudrho)
         endif
         
-        call zcopy (dfftp%nnr*nspin_mag,drhoscfh(1,1,ipert),1,dvscfout(1,1,ipert),1)
-        call dv_of_drho (imode0+ipert, dvscfout(1,1,ipert), .true.)
+        call zcopy (dfftp%nnr*nspin_mag,drhoscfh(1,1),1,dvscfout(1,1),1)
+        call dv_of_drho (imode0+ipert, dvscfout(1,1), .true.)
      enddo
      !
      !   And we mix with the old potential
@@ -461,20 +482,20 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      !
      !  In this case we mix also dbecsum
      !
-        call setmixout(npe*dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag*npe)/2, &
+        call setmixout(dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag)/2, &
                     mixout, dvscfout, dbecsum, ndim, -1 )
-        call mix_potential (2*npe*dfftp%nnr*nspin_mag+2*ndim, &
+        call mix_potential (2*dfftp%nnr*nspin_mag+2*ndim, &
                          mixout, mixin, &
-                         alpha_mix(kter), dr2, npe*tr2_ph/npol, iter, &
+                         alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                          nmix_ph, flmixdpot, convt)
-        call setmixout(npe*dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag*npe)/2, &
+        call setmixout(dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag)/2, &
                        mixin, dvscfin, dbecsum, ndim, 1 )
         if (lmetq0.and.convt) &
            call ef_shift_paw (drhoscf, dbecsum, ldos, ldoss, becsum1, &
                                                   dos_ef, irr, npe, .true.)
      ELSE
-        call mix_potential (2*npe*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
-                         alpha_mix(kter), dr2, npe*tr2_ph/npol, iter, &
+        call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
+                         alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                          nmix_ph, flmixdpot, convt)
         if (lmetq0.and.convt) &
             call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
@@ -485,7 +506,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      if (doublegrid) then
         do ipert = 1, npe
            do is = 1, nspin_mag
-              call cinterpolate (dvscfin(1,is,ipert), dvscfins(1,is,ipert), -1)
+              call cinterpolate (dvscfin(1,is), dvscfins(1,is), -1)
            enddo
         enddo
      endif

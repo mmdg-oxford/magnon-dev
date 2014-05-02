@@ -170,7 +170,7 @@ SUBROUTINE phq_readin()
   !
   ! ... set default values for variables in namelist
   !
-  tr2_ph       = 1.D-12
+  tr2_ph       = 1.D-4
   amass(:)     = 0.D0
   alpha_mix(:) = 0.D0
   alpha_mix(1) = 0.7D0
