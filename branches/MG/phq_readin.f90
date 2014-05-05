@@ -45,7 +45,7 @@ SUBROUTINE phq_readin()
   USE qpoint,        ONLY : nksq, xq
   USE partial,       ONLY : atomo, nat_todo, nat_todo_input
   USE output,        ONLY : fildyn, fildvscf, fildrho
-  USE disp,          ONLY : nq1, nq2, nq3
+  USE disp,          ONLY : nq1, nq2, nq3, num_k_pts, xk_kpoints, kpoints
   USE io_files,      ONLY : tmp_dir, prefix
   USE noncollin_module, ONLY : i_cons, noncolin
   USE ldaU,          ONLY : lda_plus_u
@@ -94,7 +94,7 @@ SUBROUTINE phq_readin()
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star
+                       drho_star, dvscf_star, kpoints
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -273,7 +273,6 @@ SUBROUTINE phq_readin()
   trans = trans .OR. ldisp
    
   !
-  !
   !  We can calculate  dielectric, raman or elop tensors and no Born effective
   !  charges dF/dE, but we cannot calculate Born effective charges dF/dE
   !  without epsil.
@@ -282,10 +281,44 @@ SUBROUTINE phq_readin()
   !
   !    reads the q point (just if ldisp = .false.)
   !
-  IF (ionode) THEN
-     IF (.NOT. ldisp) &
-        READ (5, *, iostat = ios) (xq (ipol), ipol = 1, 3)
-  END IF
+  !IF (ionode) THEN
+  !   IF (.NOT. ldisp) &
+  !      READ (5, *, iostat = ios) (xq (ipol), ipol = 1, 3)
+  !END IF
+
+ IF (kpoints) then
+     num_k_pts = 0
+     IF (ionode) THEN
+        READ (5, *, iostat = ios) card
+        print*, card
+        IF ( TRIM(card)=='K_POINTS'.OR. &
+             TRIM(card)=='k_points'.OR. &
+             TRIM(card)=='K_points') THEN
+           READ (5, *, iostat = ios) num_k_pts
+        ENDIF
+     ENDIF
+     CALL mp_bcast(ios, ionode_id )
+     CALL errore ('gwq_readin', 'reading number of kpoints', ABS(ios) )
+     CALL mp_bcast(num_k_pts, ionode_id )
+     if (num_k_pts > 30) call errore('mag_readin','Too many k-points',1) 
+     if (num_k_pts < 1) call errore('mag_readin','Too few kpoints',1) 
+     IF (ionode) THEN
+        IF ( TRIM(card)=='K_POINTS'.OR. &
+             TRIM(card)=='k_points'.OR. &
+             TRIM(card)=='K_points') THEN
+           DO i = 1, num_k_pts
+             !should be in units of 2pi/a0 cartesian co-ordinates
+              READ (5, *, iostat = ios) xk_kpoints(1,i), xk_kpoints(2,i), xk_kpoints(3,i)
+           END DO
+        END IF
+     END IF
+     CALL mp_bcast(ios, ionode_id)
+     CALL errore ('gwq_readin', 'reading KPOINTS card', ABS(ios) )
+     CALL mp_bcast(xk_kpoints, ionode_id )
+ ELSE
+     num_k_pts = 1
+ ENDIF
+
   CALL mp_bcast(ios, ionode_id)
   CALL errore ('phq_readin', 'reading xq', ABS (ios) )
   CALL mp_bcast(xq, ionode_id )
