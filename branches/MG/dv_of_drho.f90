@@ -7,7 +7,7 @@
 !
 !
 !-----------------------------------------------------------------------
-subroutine dv_of_drho (mode, dvscf, add_nlcc)
+subroutine dv_of_drho (dvscf, add_nlcc)
   !-----------------------------------------------------------------------
   !
   !     This routine computes the change of the self consistent potential
@@ -64,13 +64,15 @@ subroutine dv_of_drho (mode, dvscf, add_nlcc)
   !
   if (lrpa) goto 111
   fac = 1.d0 / DBLE (nspin_lsda)
+
   if (nlcc_any.and.add_nlcc) then
-     if (mode > 0) call addcore (mode, drhoc)
+!     if (mode > 0) call addcore (mode, drhoc)
      do is = 1, nspin_lsda
         rho%of_r(:, is) = rho%of_r(:, is) + fac * rho_core (:)
         dvscf(:, is) = dvscf(:, is) + fac * drhoc (:)
      enddo
   endif
+
   do is = 1, nspin_mag
      do is1 = 1, nspin_mag
         do ir = 1, dfftp%nnr

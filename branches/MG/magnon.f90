@@ -90,6 +90,7 @@ PROGRAM magnon
   !
   DO iq = 1, nqs
      !
+     print*, "Number of qpoints to calc.", nqs
      CALL prepare_q(do_band, do_iq, setup_pw, iq)
      !
      !  If necessary the bands are recalculated
@@ -103,7 +104,7 @@ PROGRAM magnon
      !
      !  magnon perturbation
      !
-     CALL phqscf()
+     CALL magscf()
     !calculates dielectric tensor:
     !CALL phescf()
      CALL clean_pw_ph(iq)

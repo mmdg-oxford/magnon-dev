@@ -47,6 +47,8 @@ subroutine allocate_phq
   !
   !  allocate space for the quantities needed in the phonon program
   !
+  !HL
+  lgamma=.false.
   if (lgamma) then
      !
      !  q=0  : evq and igkq are pointers to evc and igk

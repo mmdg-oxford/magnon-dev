@@ -239,9 +239,12 @@ SUBROUTINE solve_linter (drhoscf)
         endif
 
         if (lgamma)  npwq = npw
+
         ikk = ikks(ik)
         ikq = ikqs(ik)
+
         if (lsda) current_spin = isk (ikk)
+
         if (.not.lgamma.and.nksq.gt.1) then
            read (iunigk, err = 200, iostat = ios) npwq, igkq
 200        call errore ('solve_linter', 'reading igkq', abs (ios) )
@@ -314,11 +317,9 @@ SUBROUTINE solve_linter (drhoscf)
               !HL THIS TERM PROBABLY NEEDS TO BE INCLUDED.
               !call adddvscf (ipert, ik)
            else
-              !
-              !  At the first iteration dvbare_q*psi_kpoint is calculated
-              !  and written to file
-              !
-              !call dvqpsi_us (ik, u (1, mode),.false. )
+             ! At the first iteration dvbare_q*psi_kpoint is calculated
+             ! and written to file
+             ! call dvqpsi_us (ik, u (1, mode),.false. )
                call dvqpsi_mag_us (ik, .false.)
                call davcio (dvpsi, lrbar, iubar, nrec, 1)
            endif
@@ -385,8 +386,7 @@ SUBROUTINE solve_linter (drhoscf)
               call incdrhoscf (drhoscf(1,current_spin), weight, ik, &
                             dbecsum(1,1,current_spin,ipert), dpsi)
            END IF
-        ! on k-points
-     enddo
+     enddo! on k-points
 #ifdef __MPI
      !
      !  The calculation of dbecsum is distributed across processors (see addusdbec)
@@ -409,12 +409,12 @@ SUBROUTINE solve_linter (drhoscf)
         call zcopy (nspin_mag*dfftp%nnr, drhoscf, 1, drhoscfh, 1)
      endif
      !
-     !  In the noncolinear, spin-orbit case rotate dbecsum
+     !In the noncolinear, spin-orbit case rotate dbecsum
      !
      !HL might also need this in set_int12
      !IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum)
      !
-     !    Now we compute for all perturbations the total charge and potential
+     !  Now we compute for all perturbations the total charge and potential
      !
      call addusddens (drhoscfh, dbecsum, imode0, npe, 0)
 #ifdef __MPI
@@ -448,33 +448,29 @@ SUBROUTINE solve_linter (drhoscf)
      !
      IF (.not.lgamma_gamma) THEN
 #ifdef __MPI
-        call psymdvscf (npe, irr, drhoscfh)
-        IF ( noncolin.and.domag ) &
-           CALL psym_dmag( npe, irr, drhoscfh)
+!        call psymdvscf (npe, irr, drhoscfh)
+!        IF ( noncolin.and.domag ) &
+!           CALL psym_dmag( npe, irr, drhoscfh)
 #else
-        call symdvscf (npe, irr, drhoscfh)
-        IF ( noncolin.and.domag ) CALL sym_dmag( npe, irr, drhoscfh)
+!        call symdvscf (npe, irr, drhoscfh)
+!        IF ( noncolin.and.domag ) CALL sym_dmag( npe, irr, drhoscfh)
 #endif
-        IF (okpaw) THEN
-           IF (minus_q) CALL PAW_dumqsymmetrize(dbecsum,npe,irr, &
-                             npertx,irotmq,rtau,xq,tmq)
-           CALL  &
-              PAW_dusymmetrize(dbecsum,npe,irr,npertx,nsymq,rtau,xq,t)
-        END IF
+!        IF (okpaw) THEN
+!           IF (minus_q) CALL PAW_dumqsymmetrize(dbecsum,npe,irr, &
+!                             npertx,irotmq,rtau,xq,tmq)
+!           CALL  &
+!              PAW_dusymmetrize(dbecsum,npe,irr,npertx,nsymq,rtau,xq,t)
+!        END IF
      ENDIF
      !
      !   ... save them on disk and
      !   compute the corresponding change in scf potential
      !
-     do ipert = 1, npe
-        if (fildrho.ne.' ') then 
-           call davcio_drho (drhoscfh(1,1), lrdrho, iudrho, imode0+ipert, +1)
-!           close(iudrho)
-        endif
-        
-        call zcopy (dfftp%nnr*nspin_mag,drhoscfh(1,1),1,dvscfout(1,1),1)
-        call dv_of_drho (imode0+ipert, dvscfout(1,1), .true.)
-     enddo
+     if (fildrho.ne.' ') then 
+        call davcio_drho (drhoscfh(1,1), lrdrho, iudrho, imode0+ipert, +1)
+     endif
+     call zcopy (dfftp%nnr*nspin_mag, drhoscfh(1,1), 1, dvscfout(1,1), 1)
+     call dv_of_drho (dvscfout(1,1), .false.)
      !
      !   And we mix with the old potential
      !
@@ -519,7 +515,7 @@ SUBROUTINE solve_linter (drhoscf)
      !     with the new change of the potential we compute the integrals
      !     of the change of potential and Q
      !
-     call newdq (dvscfin, npe)
+     !call newdq (dvscfin, npe)
 #ifdef __MPI
      aux_avg (1) = DBLE (ltaver)
      aux_avg (2) = DBLE (lintercall)
