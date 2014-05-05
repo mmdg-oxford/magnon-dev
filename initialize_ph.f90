@@ -71,7 +71,7 @@ SUBROUTINE initialize_ph()
   !
   CALL phq_init()
   !
-  CALL print_clock( 'PHONON' )
+  CALL print_clock( 'MAGNON' )
   !
   RETURN
 

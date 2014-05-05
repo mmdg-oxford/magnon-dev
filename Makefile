@@ -14,7 +14,7 @@ adddvscf.o \
 addnlcc.o \
 addusdbec.o \
 addusdbec_nc.o \
-addusddens.o \
+addusddensworking.o \
 addusddense.o \
 addusldos.o \
 allocate_part.o \
@@ -82,7 +82,7 @@ phq_readin.o \
 phq_recover.o \
 phq_setup.o \
 phq_summary.o \
-phqscf.o \
+magscf.o \
 phescf.o \
 ph_restart.o \
 polariz.o \

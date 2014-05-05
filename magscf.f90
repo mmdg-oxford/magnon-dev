@@ -7,7 +7,7 @@
 !
 !
 !-----------------------------------------------------------------------
-SUBROUTINE phqscf
+SUBROUTINE magscf
   !-----------------------------------------------------------------------
   !
   !     This subroutine is the main driver of the self consistent cycle
@@ -31,13 +31,14 @@ SUBROUTINE phqscf
   USE paw_variables, ONLY : okpaw
   USE noncollin_module, ONLY : noncolin, nspin_mag
   USE recover_mod, ONLY : write_rec
+  USE qpoint,          ONLY : xq
 
   USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
   USE mp,         ONLY : mp_sum
 
   IMPLICIT NONE
 
-  INTEGER :: irr, irr1, imode0, npe
+  INTEGER :: irr, irr1, imode0, npe, ig
   ! counter on the representations
   ! counter on the representations
   ! counter on the modes
@@ -52,29 +53,32 @@ SUBROUTINE phqscf
   EXTERNAL get_clock
   ! the change of density due to perturbations
 
-  CALL start_clock ('phqscf')
+  CALL start_clock ('magscf')
 
         ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag))
         imode0 = 0
-        IF (okvan) THEN
-           print*, nhm, npe,nat,nspin_mag
-!          ALLOCATE (int3 ( nhm, nhm, npe, nat, nspin_mag))
-!           IF (okpaw) ALLOCATE (int3_paw (nhm, nhm, npe, nat, nspin_mag))
-!           IF (noncolin) ALLOCATE(int3_nc( nhm, nhm, npe, nat, nspin))
-        ENDIF
 
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
         CALL solve_linter (drhoscfs(1,1))
         WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
 
-        IF (okvan) THEN
-           DEALLOCATE (int3)
-           IF (okpaw) DEALLOCATE (int3_paw)
-           IF (noncolin) DEALLOCATE(int3_nc)
-        ENDIF
-        tcpu = get_clock ('PHONON')
+        WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
+        WRITE( stdout, '(/,5x,"X_[G](Gp)")')
+        WRITE( stdout, '("charge density response ")')
+        WRITE( stdout, *)
+
+        write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
+        WRITE( stdout, *)
+
+        WRITE( stdout, '("magnetization density response" )')
+        WRITE( stdout, *)
+        write(stdout,'(7f14.7)') (real(drhoscfs (ig,2)), ig = 1,7)
+        write(stdout,'(7f14.7)') (real(drhoscfs (ig,3)), ig = 1,7)
+        write(stdout,'(7f14.7)') (real(drhoscfs (ig,4)), ig = 1,7)
+
+        tcpu = get_clock ('MAGNON')
         !
         DEALLOCATE (drhoscfs)
-  CALL stop_clock ('phqscf')
+  CALL stop_clock ('magscf')
   RETURN
-END SUBROUTINE phqscf
+END SUBROUTINE magscf

@@ -44,7 +44,6 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   !
   !   And the local variables
   !
-  complex(DP), allocatable  :: psic (:,:)
 
   integer :: na, mu, ikk, ig, nt, ibnd, ir, is, ip
   ! counter on atoms
@@ -57,6 +56,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
 
   complex(DP) :: gtau, gu, fact, u1, u2, u3, gu0
   complex(DP) , allocatable, target :: aux (:)
+  complex(DP),  allocatable  :: psic (:,:)
   complex(DP) , allocatable :: aux1 (:), aux2 (:,:)
   complex(DP) , pointer :: auxs (:)
   ! work space
@@ -70,6 +70,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
         auxs => aux
      endif
   endif
+
   allocate (aux1(dffts%nnr))
   allocate (aux2(dffts%nnr, npol))
   allocate (psic(dffts%nnr, npol))
@@ -82,12 +83,12 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   ikk = ikks(ik)
   dvpsi(:,:) = (0.d0, 0.d0)
   aux1(:)    = (0.d0, 0.d0)
-  aux2       = (0.d0, 0.d0)
+  aux2(:,:)       = (0.d0, 0.d0)
 
   !in a.u. \mu_{B} = 1/2
   ! \mu_{B} * FFT[B_{q}(G)]
   !scalar component of field.
-  aux1 (nl(1)) = 0.5*1.0d0
+  aux1 (nls(1)) = 0.5*1.0d0
 
   !moved into real space:
   CALL invfft ('Smooth', aux1, dffts)
@@ -98,11 +99,11 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
       WRITE(6,'("WARNING NLCC NOT IMPLEMENTED.")')
    endif
 
-  do ibnd=1, nbnd
+  do ibnd = 1, nbnd
     psic = (0.d0, 0.d0)
     aux2 = (0.d0, 0.d0)
 
-    do ig = 1, npwq
+    do ig = 1, npw
        psic (nls (igk (ig)), 1 ) = evc (ig, ibnd)
        psic (nls (igk (ig)), 2 ) = evc (ig+npwx, ibnd)
     enddo
@@ -131,8 +132,6 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
 
       CALL fwfft ('Wave', aux2(:,1), dffts)
       CALL fwfft ('Wave', aux2(:,2), dffts)
-!igkq pointing to wrong place!
-
       do ip = 1, npol
         if (ip==1) then
            do ig = 1, npwq
@@ -140,14 +139,15 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
            enddo
         else
            do ig = 1, npwq
-              dvpsi (ig+npwx, ibnd) = aux2 (nls (igkq (ig) ), 2)
+             dvpsi (ig+npwx, ibnd) = aux2 (nls (igkq (ig) ), 2)
            enddo
         end if
       enddo!npol
     enddo!nbnd
 !
-  deallocate (aux2)
+  deallocate (psic)
   deallocate (aux1)
+  deallocate (aux2)
   if (nlcc_any.and.addnlcc) then
      deallocate (aux)
      if (doublegrid) deallocate (auxs)

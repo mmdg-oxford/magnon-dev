@@ -82,6 +82,7 @@ subroutine addusddense (drhoscf, dbecsum)
         ijh = 0
         do ih = 1, nh (nt)
            do jh = ih, nh (nt)
+          !qvan2 computes the fourier transform of the Q functions places them in qgm 
               call qvan2 (ngm, ih, jh, nt, qmod, qgm, ylmk0)
               ijh = ijh + 1
               do na = 1, nat
