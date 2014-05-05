@@ -27,8 +27,8 @@ SUBROUTINE prepare_q(do_band, do_iq, setup_pw, iq, minq)
   USE io_global,       ONLY : stdout, ionode
   USE klist,           ONLY : lgauss
   USE qpoint,          ONLY : xq
-  USE disp,            ONLY : x_q, done_iq, rep_iq, done_rep_iq, comp_iq!,&
- !                            xk_kpoints
+  USE disp,            ONLY : x_q, done_iq, rep_iq, done_rep_iq, comp_iq,&
+                              xk_kpoints
   USE control_ph,      ONLY : ldisp, lgamma, epsil, trans, zue, zeu, &
                               start_irr, last_irr, current_iq, &
                               done_bands, tmp_dir_phq, tmp_dir_ph
@@ -65,7 +65,8 @@ SUBROUTINE prepare_q(do_band, do_iq, setup_pw, iq, minq)
      ! ... set the name for the output file
      ! ... set the q point
 !MINUS Q
-       xq(1:3)  = -x_q(1:3,iq)
+!       xq(1:3)  = x_q(1:3,iq)
+       xq(1:3)  = xk_kpoints(1:3,iq)
        if ( xq(1) == 0.D0 .AND. xq(2) == 0.D0 .AND. xq(3) == 0.D0 ) xq(1) = 0.1
 !      xq(:) = xk_kpoints(:, 1)
 !Check if it is lgamma

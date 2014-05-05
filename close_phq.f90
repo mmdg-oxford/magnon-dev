@@ -21,7 +21,6 @@ SUBROUTINE close_phq( flag )
   USE units_ph,      ONLY : iuwfc, iudwf, iubar, iudrhous, iuebar, iudrho, &
                             iudvscf, iucom, iudvkb3, iuint3paw
   USE control_ph,    ONLY : zue, epsil
-  USE recover_mod,   ONLY : clean_recover
   USE output,        ONLY : fildrho, fildvscf
   !
   IMPLICIT NONE
@@ -91,7 +90,7 @@ SUBROUTINE close_phq( flag )
      IF (opnd) CLOSE( UNIT = iudrho, STATUS = 'KEEP' )
   ENDIF
   !
-  IF ( flag ) CALL clean_recover()
+  !IF ( flag ) CALL clean_recover()
   !
   IF ( fildvscf /= ' ' ) THEN
      INQUIRE( UNIT=iudvscf, OPENED=opnd ) 

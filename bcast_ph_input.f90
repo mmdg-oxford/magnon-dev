@@ -22,7 +22,7 @@ subroutine bcast_ph_input ( )
                          ldisp, reduce_io, zue, zeu, epsil, trans, &
                          lgamma, ldiag, lqdir, search_sym,  electron_phonon
   USE gamma_gamma, ONLY : asr
-  USE disp, ONLY : nq1, nq2, nq3
+  USE disp, ONLY : nq1, nq2, nq3, kpoints, xk_kpoints
   USE partial, ONLY : nat_todo
   USE freq_ph, ONLY : fpol
   USE output, ONLY : fildvscf, fildyn, fildrho
@@ -52,6 +52,9 @@ subroutine bcast_ph_input ( )
   call mp_bcast (ldiag, ionode_id )
   call mp_bcast (lqdir, ionode_id )
   call mp_bcast (search_sym, ionode_id)
+
+  !mag stuff
+  call mp_bcast(kpoints, ionode_id)
   !
   ! integers
   !

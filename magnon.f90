@@ -47,7 +47,7 @@ PROGRAM magnon
   ! [10] ?  + nonperiodic boundary conditions.
 
   USE io_global,       ONLY : stdout
-  USE disp,            ONLY : nqs
+  USE disp,            ONLY : nqs, num_k_pts
   USE control_ph,      ONLY : epsil, trans, bands_computed
   USE output,          ONLY : fildrho
   USE check_stop,      ONLY : check_stop_init
@@ -88,9 +88,10 @@ PROGRAM magnon
   !
   CALL check_initial_status(auxdyn)
   !
-  DO iq = 1, nqs
+  !DO iq = 1, nqs
+  DO iq = 1, num_k_pts
      !
-     print*, "Number of qpoints to calc.", nqs
+     print*, "Number of qpoints to calc.", num_k_pts
      CALL prepare_q(do_band, do_iq, setup_pw, iq)
      !
      !  If necessary the bands are recalculated

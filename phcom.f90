@@ -426,6 +426,13 @@ MODULE disp
        nsymq_iq(:),     &! dimension of the small group of q
        comp_irr_iq(:,:),&! for each q, comp_irr. Used for image parallelization
        npert_iq(:,:)     ! for each q, the number of perturbation of each irr
+
+ ! kpoints: default false.
+ ! if true specifies the k-points we want to look 
+ ! at in the brillouin zone specified by user in punch card.  
+  LOGICAL  :: kpoints 
+  REAL(DP) :: xk_kpoints(3,30)
+  INTEGER  :: num_k_pts
   !
 END MODULE disp
 !

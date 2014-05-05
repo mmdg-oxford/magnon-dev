@@ -58,23 +58,32 @@ SUBROUTINE magscf
         ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag))
         imode0 = 0
 
+        WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
         CALL solve_linter (drhoscfs(1,1))
         WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
+
 
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"X_[G](Gp)")')
         WRITE( stdout, '("charge density response ")')
         WRITE( stdout, *)
 
+
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
         WRITE( stdout, *)
+
 
         WRITE( stdout, '("magnetization density response" )')
         WRITE( stdout, *)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,2)), ig = 1,7)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,3)), ig = 1,7)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,4)), ig = 1,7)
+
+
+        WRITE( stdout, '("magnetization density response" )')
+        write(stdout,'("rechiq, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
+        write(stdout,'("imchiq", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
 
         tcpu = get_clock ('MAGNON')
         !
