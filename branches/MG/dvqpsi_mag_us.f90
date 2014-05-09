@@ -88,6 +88,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   !in a.u. \mu_{B} = 1/2
   ! \mu_{B} * FFT[B_{q}(G)]
   !scalar component of field.
+  !just set to G= 0 0 0 
   aux1 (nls(1)) = 0.5*1.0d0
 
   !moved into real space:
@@ -125,10 +126,10 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
         enddo
 
 !Z: \mu_b \sigma_{z}B_{z}
-!        do ir = 1, dffts%nnr
-!           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
-!           aux2(ir,2) = aux2(ir,2) - aux1 (ir)*psic(ir,2)
-!        enddo
+        do ir = 1, dffts%nnr
+           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+           aux2(ir,2) = aux2(ir,2) - aux1 (ir)*psic(ir,2)
+        enddo
 
       CALL fwfft ('Wave', aux2(:,1), dffts)
       CALL fwfft ('Wave', aux2(:,2), dffts)
