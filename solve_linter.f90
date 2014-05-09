@@ -305,6 +305,7 @@ SUBROUTINE solve_linter (drhoscf)
               do ibnd = 1, nbnd_occ (ikk)
                  call cft_wave (evc (1, ibnd), aux1, +1)
                  call apply_dpot(dffts%nnr, aux1, dvscfins(1,1), current_spin)
+                 !call apply_dmag(dffts%nnr, aux1, dvscfins(1,1), current_spin)
                  call cft_wave (dvpsi (1, ibnd), aux1, -1)
               enddo
               call stop_clock ('vpsifft')
