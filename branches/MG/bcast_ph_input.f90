@@ -22,6 +22,7 @@ subroutine bcast_ph_input ( )
                          ldisp, reduce_io, zue, zeu, epsil, trans, &
                          lgamma, ldiag, lqdir, search_sym,  electron_phonon
   USE gamma_gamma, ONLY : asr
+  USE qpoint, ONLY: dbext
   USE disp, ONLY : nq1, nq2, nq3, kpoints, xk_kpoints
   USE partial, ONLY : nat_todo
   USE freq_ph, ONLY : fpol
@@ -84,6 +85,8 @@ subroutine bcast_ph_input ( )
   call mp_bcast (amass, ionode_id )
   call mp_bcast (alpha_mix, ionode_id )
   call mp_bcast (max_seconds, ionode_id )
+  !
+  call mp_bcast (dbext, ionode_id )
   !
   ! characters
   !

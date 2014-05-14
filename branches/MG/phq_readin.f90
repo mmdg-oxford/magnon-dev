@@ -42,7 +42,7 @@ SUBROUTINE phq_readin()
                             search_sym, lqdir, electron_phonon
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
-  USE qpoint,        ONLY : nksq, xq
+  USE qpoint,        ONLY : nksq, xq, dbext
   USE partial,       ONLY : atomo, nat_todo, nat_todo_input
   USE output,        ONLY : fildyn, fildvscf, fildrho
   USE disp,          ONLY : nq1, nq2, nq3, num_k_pts, xk_kpoints, kpoints
@@ -94,7 +94,7 @@ SUBROUTINE phq_readin()
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star, kpoints
+                       drho_star, dvscf_star, kpoints, dbext
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -215,6 +215,9 @@ SUBROUTINE phq_readin()
   k1       = 0
   k2       = 0
   k3       = 0
+  dbext(1) = 1.0
+  dbext(2) = 1.0
+  dbext(3) = 0.0
   !
   drho_star%open = .FALSE.
   drho_star%basis = 'modes'
