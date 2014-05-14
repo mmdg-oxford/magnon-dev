@@ -32,6 +32,8 @@ SUBROUTINE magscf
   USE noncollin_module, ONLY : noncolin, nspin_mag
   USE recover_mod, ONLY : write_rec
   USE qpoint,          ONLY : xq
+  USE fft_base,   ONLY: dfftp, dffts
+  USE fft_interfaces, ONLY: fwfft, invfft
 
   USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
   USE mp,         ONLY : mp_sum
@@ -60,10 +62,12 @@ SUBROUTINE magscf
 
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
+
         CALL solve_linter (drhoscfs(1,1))
+
+        
+      
         WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
-
-
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"X_[G](Gp)")')
         WRITE( stdout, '("charge density response ")')
@@ -71,9 +75,12 @@ SUBROUTINE magscf
 
 
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
+
+        do ig=1, nspin_mag
+          CALL fwfft ('Smooth', drhoscfs(:,ig), dffts)
+        enddo
+
         WRITE( stdout, *)
-
-
         WRITE(stdout, '("magnetization density response" )')
         WRITE(stdout, *)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,2)), ig = 1,7)

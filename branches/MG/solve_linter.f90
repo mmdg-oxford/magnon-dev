@@ -557,6 +557,12 @@ SUBROUTINE solve_linter (drhoscf)
   !    the charge due to the displacement of the atoms.
   !    We compute it here.
   !
+!Set drhoscf to the converged potential.
+!   drhoscf(:,:) = dvscfin(:,:)
+
+!    drhoscf(:,:) = dvscfin(:,:)
+!HL 
+!    drhoscf(:,:) = drhoscfh(:,:)
 
   if (convt.and.nlcc_any) call addnlcc (imode0, drhoscfh, npe)
 
