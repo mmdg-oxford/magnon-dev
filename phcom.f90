@@ -89,6 +89,7 @@ MODULE qpoint
   ! the index of k point in the list of k
   ! the index of k+q point in the list of k
   REAL (DP) :: xq(3)
+  REAL (DP) :: dbext(3)
   ! the coordinates of the q point
   COMPLEX (DP), ALLOCATABLE :: eigqts(:) ! nat)
   ! the phases associated to the q

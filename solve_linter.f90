@@ -199,6 +199,7 @@ SUBROUTINE solve_linter (drhoscf)
   !
 
   lmetq0 = lgauss.and.lgamma
+
   if (lmetq0) then
      allocate ( ldos ( dfftp%nnr  , nspin_mag) )
      allocate ( ldoss( dffts%nnr , nspin_mag) )
