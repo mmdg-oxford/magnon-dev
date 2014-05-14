@@ -74,16 +74,19 @@ SUBROUTINE magscf
         WRITE( stdout, *)
 
 
-        WRITE( stdout, '("magnetization density response" )')
-        WRITE( stdout, *)
+        WRITE(stdout, '("magnetization density response" )')
+        WRITE(stdout, *)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,2)), ig = 1,7)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,3)), ig = 1,7)
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,4)), ig = 1,7)
 
 
-        WRITE( stdout, '("magnetization density response" )')
+        WRITE(stdout, '("magnetization density response" )')
+!       G=G'= (0 0 0)
         write(stdout,'("rechiq, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
         write(stdout,'("imchiq", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
+!        write(600,'("rechiq, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
+!        write(601,'("imchiq", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
 
         tcpu = get_clock ('MAGNON')
         !

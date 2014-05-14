@@ -89,7 +89,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   ! \mu_{B} * FFT[B_{q}(G)]
   !scalar component of field.
   !just set to G= 0 0 0 
-  aux1 (nls(1)) = 0.5*1.0d0
+  aux1 (nls(1)) = 0.5*4.255d-6
 
   !moved into real space:
   CALL invfft ('Smooth', aux1, dffts)
