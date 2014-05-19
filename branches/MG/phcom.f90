@@ -333,7 +333,8 @@ MODULE control_ph
              lqdir=.FALSE.,        & ! if true each q writes in its directory
              xmldyn=.FALSE.,   & ! if true the dynamical matrix is in xml form
              all_done, &      ! if .TRUE. all representations have been done
-             newgrid=.FALSE.  ! if .TRUE. use new k-point grid nk1,nk2,nk3
+             newgrid=.FALSE., & ! if .TRUE. use new k-point grid nk1,nk2,nk3
+             do_elec
   !
 END MODULE control_ph
 !

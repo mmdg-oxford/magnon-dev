@@ -120,8 +120,7 @@ subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
   aux(:,:) = (0.d0, 0.d0)
 
 !HL freezing modes perts
-  npe = 1
-  ipert = 1
+!  npe = 1
 !HL Debug
 
   do nt = 1, ntyp
@@ -152,14 +151,12 @@ subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
                     !  And qgmq and becp and dbecq
                     !
                        do is = 1, nspin_mag
-                         ! mode = mode0 + ipert
                            mode = 1
                           if (iflag==1) then
                              zsum = dbecsum (ijh, na, is)
                           else
                              zsum = 2.0_DP*dbecsum (ijh, na, is)
                           endif
-
 ! HL iflag = 1 only occurs if this routine is called from drho.f90 
 ! i.e. for situations where the augmentation charge/ beta functions have changed. 
                              call zaxpy (ngm, zsum, sk, 1, aux(1,is), 1)
@@ -191,19 +188,6 @@ subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
   deallocate (ylmk0)
   deallocate (sk)
   deallocate (aux)
-
-! HL commenting NON-SCF contribution from perturbation of Augmentation Charge.
-!  if (iflag == 0) then
-!     allocate (drhous( nrxx, nspin_mag))    
-!     do ipert = 1, npe
-!        mu = mode0 + ipert
-!         mu = 1
-!        I think drhous (Calculated in drho.f90) is unnecessary in GW case. 
-!        call davcio (drhous, lrdrhous, iudrhous, mu, -1)
-!        call daxpy (2*nrxx*nspin_mag, 1.d0, drhous, 1, drhoscf(1,1), 1)
-!     enddo
-!     deallocate (drhous)
-!  end if
 
   call stop_clock ('addusddens')
   return
