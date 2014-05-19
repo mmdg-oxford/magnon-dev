@@ -64,7 +64,8 @@ SUBROUTINE openfilq()
   !     written by pw.x. In the other cases those calculated by ph.x
   !
   tmp_dir=tmp_dir_phq
-  IF (lgamma.AND.modenum==0.AND.nk1.eq.0.AND.nk2.eq.0.AND.nk3.eq.0) tmp_dir=tmp_dir_save
+
+  !IF (lgamma.AND.modenum==0.AND.nk1.eq.0.AND.nk2.eq.0.AND.nk3.eq.0) tmp_dir=tmp_dir_save
 
   iuwfc = 20
   lrwfc = 2 * nbnd * npwx * npol

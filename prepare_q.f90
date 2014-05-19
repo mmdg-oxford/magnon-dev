@@ -87,14 +87,9 @@ SUBROUTINE prepare_q(do_band, do_iq, setup_pw, iq, minq)
   !
   ! ... In the case of q != 0, we make first a non selfconsistent run
   !
-  setup_pw = (.NOT.lgamma.OR.modenum /= 0).AND..NOT. done_bands
-  do_band=.FALSE.
-  DO irr=start_irr, MIN(ABS(last_irr),rep_iq(iq))
-     IF (done_rep_iq(irr,iq) /= 1) THEN
-        do_band=.TRUE.
-        EXIT
-     ENDIF
-  ENDDO
+  !setup_pw = (.NOT.lgamma.OR.modenum /= 0).AND..NOT. done_bands
+  setup_pw = .TRUE.
+  do_band  = .TRUE.
 !
 !  There are two special cases. When start_irr=0 and last_irr=0 we generate only
 !  the displacement patterns, and do not calculate the bands. If this q

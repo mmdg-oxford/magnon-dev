@@ -137,10 +137,8 @@ subroutine ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, flag)
                 call davcio (dpsi, lrdwf, iudwf, nrec, +1)
         enddo
      enddo
-     do ipert = 1, npert (irr)
-        do is = 1, nspin_mag
-           call zaxpy (dffts%nnr, def(ipert), ldoss(1,is), 1, drhoscf(1,is,ipert), 1)
-        enddo
+     do is = 1, nspin_mag
+        call zaxpy (dffts%nnr, def(ipert), ldoss(1,is), 1, drhoscf(1,is,ipert), 1)
      enddo
   endif
   call stop_clock ('ef_shift')
