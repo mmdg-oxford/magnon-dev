@@ -552,17 +552,10 @@ SUBROUTINE solve_linter (drhoscf)
   enddo
 155 iter0=0
   !
-  !    A part of the dynamical matrix requires the integral of
-  !    the self consistent change of the potential and the variation of
-  !    the charge due to the displacement of the atoms.
-  !    We compute it here.
   !
-!Set drhoscf to the converged potential.
-!   drhoscf(:,:) = dvscfin(:,:)
-
-!    drhoscf(:,:) = dvscfin(:,:)
-!HL 
-!    drhoscf(:,:) = drhoscfh(:,:)
+!HL For electric fields set drhoscf to the converged potential.
+!\epsilon^{-1} = \delta_{GG'} + \delta n_{G}(G')
+drhoscf(:,:) = dvscfin(:,:)
 
   if (convt.and.nlcc_any) call addnlcc (imode0, drhoscfh, npe)
 

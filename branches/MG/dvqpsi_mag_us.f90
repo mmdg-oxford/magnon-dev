@@ -90,9 +90,9 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   !scalar component of field.
   !just set to G= 0 0 0 
    !aux1 (nls(1)) = 0.5*4.255d-6
-   aux1 (nls(1)) = 0.5*4.255
+  ! aux1 (nls(1)) = 0.5*4.255
   !for electric field
-  !aux1 (nls(1)) = dcmplx(1.0, 0.0d0)
+  aux1 (nls(1)) = dcmplx(1.0, 0.0d0)
 
   !moved into real space:
   CALL invfft ('Smooth', aux1, dffts)
@@ -118,15 +118,17 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
 !HL initial test with B_{+-}
 !X: \mu_b \sigma_{x}B_{x}
         do ir = 1, dffts%nnr
-          aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
-          aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
+          !aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
+          !aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
+          aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+          aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
         enddo
 
 !Y: \mu_b \sigma_{y}B_{y}
-        do ir = 1, dffts%nnr
-           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
-           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
-        enddo
+!        do ir = 1, dffts%nnr
+!           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
+!           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
+!        enddo
 
 !Z: \mu_b \sigma_{z}B_{z}
 !        do ir = 1, dffts%nnr

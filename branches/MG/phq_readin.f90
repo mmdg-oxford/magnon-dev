@@ -402,8 +402,7 @@ SUBROUTINE phq_readin()
 !  If there is a restart or a recover file ph.x has saved its own data-file
 !  and we read the initial information from that file
 !
-     IF ((ext_recover.OR.ext_restart).AND..NOT.lgamma) &
-                                                      tmp_dir=tmp_dir_ph
+     IF ((ext_recover.OR.ext_restart).AND..NOT.lgamma) tmp_dir=tmp_dir_ph
      u_from_file=.true.
   ENDIF
 1001 CONTINUE

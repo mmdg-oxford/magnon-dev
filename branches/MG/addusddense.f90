@@ -99,7 +99,7 @@ subroutine addusddense (drhoscf, dbecsum)
                     !
                     do is=1,nspin_mag
                        do ipert = 1, 3
-                          zsum = dbecsum (ijh, na, is,ipert)
+                          zsum = dbecsum (ijh, na, is, ipert)
                           call zaxpy(ngm,zsum,sk,1,aux(1,is,ipert),1)
                        enddo
                     enddo
