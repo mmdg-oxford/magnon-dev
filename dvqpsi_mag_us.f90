@@ -29,7 +29,8 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   USE wavefunctions_module,  ONLY: evc
   USE nlcc_ph,    ONLY : nlcc_any, drc
   USE eqv,        ONLY : dvpsi, dmuxc, vlocq
-  USE qpoint,     ONLY : npwq, igkq, xq, eigqts, ikks
+  USE qpoint,     ONLY : npwq, igkq, xq, eigqts, ikks, dbext
+  USE control_ph, ONLY : do_elec
 
   implicit none
   !
@@ -83,25 +84,24 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   ikk = ikks(ik)
   dvpsi(:,:) = (0.d0, 0.d0)
   aux1(:)    = (0.d0, 0.d0)
-  aux2(:,:)       = (0.d0, 0.d0)
+  aux2(:,:)  = (0.d0, 0.d0)
 
   !in a.u. \mu_{B} = 1/2
   ! \mu_{B} * FFT[B_{q}(G)]
   !scalar component of field.
   !just set to G= 0 0 0 
-   !aux1 (nls(1)) = 0.5*4.255d-6
-  ! aux1 (nls(1)) = 0.5*4.255
+  !aux1 (nls(1)) = 0.5*4.255d-6
+  !aux1 (nls(1)) = 1.0
   !for electric field
   aux1 (nls(1)) = dcmplx(1.0, 0.0d0)
-
   !moved into real space:
   CALL invfft ('Smooth', aux1, dffts)
   !
   ! add NLCC when present
   !
-   if (nlcc_any.and.addnlcc) then
-      WRITE(6,'("WARNING NLCC NOT IMPLEMENTED.")')
-   endif
+  if (nlcc_any.and.addnlcc) then
+     WRITE(6,'("WARNING NLCC NOT IMPLEMENTED.")')
+  endif
 
   do ibnd = 1, nbnd
     psic = (0.d0, 0.d0)
@@ -115,27 +115,38 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
     CALL invfft ('Wave', psic(:,1), dffts)
     CALL invfft ('Wave', psic(:,2), dffts)
 
-!HL initial test with B_{+-}
-!X: \mu_b \sigma_{x}B_{x}
+!For electric field perturbation couples directly to wave functions.
+   if(do_elec) then
         do ir = 1, dffts%nnr
-          !aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
-          !aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
           aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
         enddo
+   else
+!HL initial test with B_{+-}
+!X: \mu_b \sigma_{x}B_{x}
+    if(dbext(1).eq.1.0) then
+        do ir = 1, dffts%nnr
+          aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
+          aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
+        enddo
+     endif
 
 !Y: \mu_b \sigma_{y}B_{y}
-!        do ir = 1, dffts%nnr
-!           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
-!           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
-!        enddo
+    if(dbext(2).eq.1.0) then
+        do ir = 1, dffts%nnr
+           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
+           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
+        enddo
+    endif
 
 !Z: \mu_b \sigma_{z}B_{z}
-!        do ir = 1, dffts%nnr
-!           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
-!           aux2(ir,2) = aux2(ir,2) - aux1 (ir)*psic(ir,2)
-!        enddo
-
+    if(dbext(3).eq.1.0) then
+        do ir = 1, dffts%nnr
+           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+           aux2(ir,2) = aux2(ir,2) - aux1 (ir)*psic(ir,2)
+        enddo
+    endif
+   endif
       CALL fwfft ('Wave', aux2(:,1), dffts)
       CALL fwfft ('Wave', aux2(:,2), dffts)
       do ip = 1, npol

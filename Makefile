@@ -104,6 +104,7 @@ rotate_dvscf_star.o \
 rotate_and_add_dyn.o \
 run_pwscf.o \
 save_ph_input.o \
+set_dbecsum_nc.o \
 set_defaults_pw.o \
 set_drhoc.o \
 set_small_group_of_q.o \
@@ -125,6 +126,8 @@ symdvscf.o \
 syme.o \
 symm.o \
 tra_write_matrix.o \
+transform_dbecsum_nc.o\
+transform_dbecsum_so.o\
 trntnsc.o \
 write_matrix.o \
 write_modes.o \

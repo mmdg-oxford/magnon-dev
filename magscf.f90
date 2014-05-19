@@ -22,7 +22,7 @@ SUBROUTINE magscf
   USE fft_base,   ONLY : dfftp
   USE uspp,  ONLY: okvan
   USE efield_mod, ONLY : zstarue0, zstarue0_rec
-  USE control_ph, ONLY : zue, convt, rec_code
+  USE control_ph, ONLY : zue, convt, rec_code, do_elec
   USE partial,    ONLY : done_irr, comp_irr
   USE modes,      ONLY : nirr, npert, npertx
   USE phus,       ONLY : int3, int3_nc, int3_paw
@@ -64,8 +64,6 @@ SUBROUTINE magscf
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
 
         CALL solve_linter (drhoscfs(1,1))
-
-        
       
         WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
@@ -77,7 +75,7 @@ SUBROUTINE magscf
         write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
 
         do ig=1, nspin_mag
-          CALL fwfft ('Smooth', drhoscfs(:,ig), dffts)
+           CALL fwfft ('Smooth', drhoscfs(:,ig), dffts)
         enddo
 
         WRITE( stdout, *)
@@ -89,13 +87,14 @@ SUBROUTINE magscf
 
 
         WRITE(stdout, '("magnetization density response" )')
+      if(do_elec) then
         write(stdout,'("eps^{-1}, "3f12.5,"  ",4f14.7)') xq(:), (1.0d0 + real(drhoscfs (1,1)))
         write(stdout,'("eps, "3f12.5,"  ",4f14.7)') xq(:), (1.0/(1.0d0 + real(drhoscfs (1,1))))
+      else
 !       G=G'= (0 0 0)
         write(stdout,'("rechiq, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
         write(stdout,'("imchiq", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
-!        write(600,'("rechiq, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
-!        write(601,'("imchiq", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
+      endif
 
         tcpu = get_clock ('MAGNON')
         !

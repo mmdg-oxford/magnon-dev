@@ -47,7 +47,7 @@ SUBROUTINE solve_linter (drhoscf)
   USE control_ph,           ONLY : rec_code, niter_ph, nmix_ph, tr2_ph, &
                                    alpha_pv, lgamma, lgamma_gamma, convt, &
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
-                                   where_rec, flmixdpot, ext_recover
+                                   where_rec, flmixdpot, ext_recover, do_elec
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwf, lrdwf, iubar, lrbar, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
@@ -412,13 +412,12 @@ SUBROUTINE solve_linter (drhoscf)
      endif
      !
      !In the noncolinear, spin-orbit case rotate dbecsum
-     !
      !HL might also need this in set_int12
-     !IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum)
+     IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum, 1)
      !
      !  Now we compute for all perturbations the total charge and potential
      !
-     call addusddens (drhoscfh, dbecsum, imode0, npe, 0)
+     call addusddens (drhoscfh, dbecsum, 1, 1, 0)
 #ifdef __MPI
      !
      !   Reduce the delta rho across pools
@@ -431,18 +430,7 @@ SUBROUTINE solve_linter (drhoscf)
      !
      ! q=0 in metallic case deserve special care (e_Fermi can shift)
      !
-
-     IF (okpaw) THEN
-        IF (lmetq0) &
-           call ef_shift_paw (drhoscfh, dbecsum, ldos, ldoss, becsum1, &
-                                                  dos_ef, irr, npe, .false.)
-        DO ipert=1,npe
-           dbecsum(:,:,:,ipert)=2.0_DP *dbecsum(:,:,:,ipert) &
-                               +becsumort(:,:,:,imode0+ipert)
-        ENDDO
-     ELSE
-        IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
-     ENDIF
+     IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
      !
      !   After the loop over the perturbations we have the linear change
      !   in the charge density for each mode of this representation.
@@ -476,28 +464,11 @@ SUBROUTINE solve_linter (drhoscf)
      !
      !   And we mix with the old potential
      !
-     IF (okpaw) THEN
-     !
-     !  In this case we mix also dbecsum
-     !
-        call setmixout(dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag)/2, &
-                    mixout, dvscfout, dbecsum, ndim, -1 )
-        call mix_potential (2*dfftp%nnr*nspin_mag+2*ndim, &
-                         mixout, mixin, &
-                         alpha_mix(kter), dr2, tr2_ph/npol, iter, &
-                         nmix_ph, flmixdpot, convt)
-        call setmixout(dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag)/2, &
-                       mixin, dvscfin, dbecsum, ndim, 1 )
-        if (lmetq0.and.convt) &
-           call ef_shift_paw (drhoscf, dbecsum, ldos, ldoss, becsum1, &
-                                                  dos_ef, irr, npe, .true.)
-     ELSE
         call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
                          alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                          nmix_ph, flmixdpot, convt)
         if (lmetq0.and.convt) &
             call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
-     ENDIF
      ! check that convergent have been reached on ALL processors in this image
      CALL check_all_convt(convt)
 
@@ -555,7 +526,11 @@ SUBROUTINE solve_linter (drhoscf)
   !
 !HL For electric fields set drhoscf to the converged potential.
 !\epsilon^{-1} = \delta_{GG'} + \delta n_{G}(G')
-drhoscf(:,:) = dvscfin(:,:)
+  if(do_elec) then
+    drhoscf(:,:) = dvscfin(:,:)
+  endif
+  !drhoscf(:,:) = drhoscfh(:,:)
+   
 
   if (convt.and.nlcc_any) call addnlcc (imode0, drhoscfh, npe)
 
