@@ -218,6 +218,8 @@ SUBROUTINE phq_readin()
   dbext(1) = 1.0
   dbext(2) = 1.0
   dbext(3) = 0.0
+  do_elec = .TRUE.
+ ! okvan=.TRUE.
   !
   drho_star%open = .FALSE.
   drho_star%basis = 'modes'
