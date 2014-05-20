@@ -6,7 +6,7 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 !----------------------------------------------------------------------------
-SUBROUTINE transform_dbecsum_nc(dbecsum_nc,dbecsum,na,modes)
+SUBROUTINE transform_dbecsum_nc(dbecsum_nc,dbecsum,na)
 !----------------------------------------------------------------------------
 !
 ! This routine multiply dbecsum_nc by the identity and the Pauli
@@ -23,54 +23,52 @@ USE spin_orb,             ONLY : domag
 IMPLICIT NONE
 
 INTEGER :: na, modes
-COMPLEX(DP) :: dbecsum_nc( nhm, nhm, nat , nspin , modes)
-COMPLEX(DP) :: dbecsum( nhm * (nhm + 1) /2 , nat , nspin_mag, modes)
+COMPLEX(DP) :: dbecsum_nc( nhm, nhm, nat , nspin)
+COMPLEX(DP) :: dbecsum( nhm * (nhm + 1) /2 , nat , nspin_mag)
 !
 ! ... local variables
 !
-INTEGER :: ih, jh, ijh, np, mode
+INTEGER :: ih, jh, ijh, np
 
 np=ityp(na)
 
-DO mode=1, modes
    ijh=1
    DO ih = 1, nh(np)
-      dbecsum(ijh,na,1,mode)= dbecsum(ijh,na,1,mode)+  &
-               dbecsum_nc(ih,ih,na,1,mode)+dbecsum_nc(ih,ih,na,4,mode)
+      dbecsum(ijh,na,1)= dbecsum(ijh,na,1)+  &
+               dbecsum_nc(ih,ih,na,1)+dbecsum_nc(ih,ih,na,4)
       IF (domag) THEN
-         dbecsum(ijh,na,2,mode)= dbecsum(ijh,na,2,mode)+  &
-                  dbecsum_nc(ih,ih,na,2,mode)+ &
-                            dbecsum_nc(ih,ih,na,3,mode)
-         dbecsum(ijh,na,3,mode)= dbecsum(ijh,na,3,mode)+ &
-                  (0.d0,-1.d0)*(dbecsum_nc(ih,ih,na,2,mode)- &
-                            dbecsum_nc(ih,ih,na,3,mode) )
-         dbecsum(ijh,na,4,mode)= dbecsum(ijh,na,4,mode)+  &
-                  dbecsum_nc(ih,ih,na,1,mode)-dbecsum_nc(ih,ih,na,4,mode)
+         dbecsum(ijh,na,2)= dbecsum(ijh,na,2)+  &
+                  dbecsum_nc(ih,ih,na,2)+ &
+                            dbecsum_nc(ih,ih,na,3)
+         dbecsum(ijh,na,3)= dbecsum(ijh,na,3)+ &
+                  (0.d0,-1.d0)*(dbecsum_nc(ih,ih,na,2)- &
+                            dbecsum_nc(ih,ih,na,3) )
+         dbecsum(ijh,na,4)= dbecsum(ijh,na,4)+  &
+                  dbecsum_nc(ih,ih,na,1)-dbecsum_nc(ih,ih,na,4)
       END IF
       ijh=ijh+1
       DO jh = ih+1, nh(np)
-         dbecsum(ijh,na,1,mode)= dbecsum(ijh,na,1,mode) +                   &
-                   dbecsum_nc(ih,jh,na,1,mode)+dbecsum_nc(ih,jh,na,4,mode)  &
-                  +dbecsum_nc(jh,ih,na,1,mode)+dbecsum_nc(jh,ih,na,4,mode)
+         dbecsum(ijh,na,1)= dbecsum(ijh,na,1) +                   &
+                   dbecsum_nc(ih,jh,na,1)+dbecsum_nc(ih,jh,na,4)  &
+                  +dbecsum_nc(jh,ih,na,1)+dbecsum_nc(jh,ih,na,4)
          IF (domag) THEN
-            dbecsum(ijh,na,2,mode)= dbecsum(ijh,na,2,mode) +     &
-                      dbecsum_nc(ih,jh,na,2,mode)+                 &
-                             dbecsum_nc(ih,jh,na,3,mode)     &
-                   +  dbecsum_nc(jh,ih,na,2,mode)+           &
-                             dbecsum_nc(jh,ih,na,3,mode)
-            dbecsum(ijh,na,3,mode)= dbecsum(ijh,na,3,mode) +        &
-                      (0.d0,-1.d0)*(dbecsum_nc(ih,jh,na,2,mode)-    &
-                                    dbecsum_nc(ih,jh,na,3,mode)     &
-                   +                dbecsum_nc(jh,ih,na,2,mode)-    &
-                                    dbecsum_nc(jh,ih,na,3,mode) )
-            dbecsum(ijh,na,4,mode)= dbecsum(ijh,na,4,mode) +     &
-                      dbecsum_nc(ih,jh,na,1,mode)-dbecsum_nc(ih,jh,na,4,mode)+&
-                      dbecsum_nc(jh,ih,na,1,mode)-dbecsum_nc(jh,ih,na,4,mode)
+            dbecsum(ijh,na,2)= dbecsum(ijh,na,2) +     &
+                      dbecsum_nc(ih,jh,na,2)+                 &
+                             dbecsum_nc(ih,jh,na,3)     &
+                   +  dbecsum_nc(jh,ih,na,2)+           &
+                             dbecsum_nc(jh,ih,na,3)
+            dbecsum(ijh,na,3)= dbecsum(ijh,na,3) +        &
+                      (0.d0,-1.d0)*(dbecsum_nc(ih,jh,na,2)-    &
+                                    dbecsum_nc(ih,jh,na,3)     &
+                   +                dbecsum_nc(jh,ih,na,2)-    &
+                                    dbecsum_nc(jh,ih,na,3) )
+            dbecsum(ijh,na,4)= dbecsum(ijh,na,4) +     &
+                      dbecsum_nc(ih,jh,na,1)-dbecsum_nc(ih,jh,na,4)+&
+                      dbecsum_nc(jh,ih,na,1)-dbecsum_nc(jh,ih,na,4)
          END IF
          ijh=ijh+1
       END DO
    END DO
-END DO
 
 RETURN
 END SUBROUTINE transform_dbecsum_nc

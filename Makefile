@@ -7,9 +7,6 @@ MODFLAGS= $(MOD_FLAG)../../iotk/src $(MOD_FLAG)../../Modules \
           $(MOD_FLAG)../../PW/src $(MOD_FLAG).
 
 MAGOBJS = \
-add_dkmds.o \
-addcore.o \
-adddvepsi_us.o \
 adddvscf.o \
 addnlcc.o \
 addusdbec.o \
@@ -35,14 +32,7 @@ clean_pw_ph.o \
 clinear.o \
 close_phq.o \
 commutator_Hx_psi.o \
-compute_becalp.o \
-compute_becsum_ph.o \
-compute_drhous.o \
-compute_drhous_nc.o \
-compute_dvloc.o \
-compute_nldyn.o \
 compute_vsgga.o \
-compute_weight.o \
 deallocate_part.o \
 deallocate_phq.o \
 davcio_drho.o \
@@ -50,11 +40,8 @@ dfile_autoname.o \
 dfile_star.o \
 dgradcorr.o \
 dielec.o \
-drho.o \
-drhodv.o \
 drhodvloc.o \
 drhodvnl.o \
-drhodvus.o \
 dv_of_drho.o \
 dvkb3.o \
 dvpsi_e.o \
