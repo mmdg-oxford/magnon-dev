@@ -25,6 +25,7 @@ subroutine incdrhoscf (drhoscf, weight, ik, dbecsum, dpsi)
   USE wavefunctions_module,  ONLY: evc
   USE qpoint,    ONLY : npwq, igkq, ikks
   USE control_ph, ONLY : nbnd_occ
+  USE noncollin_module,     ONLY : noncolin, npol, nspin_mag
 
   implicit none
   ! I/O variables

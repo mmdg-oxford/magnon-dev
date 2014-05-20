@@ -97,7 +97,7 @@ SUBROUTINE solve_linter (drhoscf)
   ! change of rho / scf potential (output)
   ! change of scf potential (output)
   complex(DP), allocatable :: ldos (:,:), ldoss (:,:), mixin(:), mixout(:), &
-       dbecsum (:,:,:,:), dbecsum_nc(:,:,:,:,:), aux1 (:,:)
+       dbecsum (:,:,:), dbecsum_nc(:,:,:,:), aux1 (:,:)
   ! Misc work space
   ! ldos : local density of states af Ef
   ! ldoss: as above, without augmentation charges
@@ -151,7 +151,7 @@ SUBROUTINE solve_linter (drhoscf)
   endif
   allocate (drhoscfh ( dfftp%nnr, nspin_mag))
   allocate (dvscfout ( dfftp%nnr, nspin_mag ))
-  allocate (dbecsum ( (nhm * (nhm + 1))/2 , nat , nspin_mag, npe))
+  allocate (dbecsum ( (nhm * (nhm + 1))/2 , nat , nspin_mag))
 
 
   IF (okpaw) THEN
@@ -161,29 +161,13 @@ SUBROUTINE solve_linter (drhoscf)
   ENDIF
 
 
-  IF (noncolin) allocate (dbecsum_nc (nhm,nhm, nat , nspin, npe))
+  IF (noncolin) allocate (dbecsum_nc (nhm, nhm, nat, nspin))
   allocate (aux1 ( dffts%nnr, npol))
   allocate (h_diag ( npwx*npol, nbnd))
   !
-  if (rec_code_read == 10.AND.ext_recover) then
-     ! restart from Phonon calculation
-     IF (okpaw) THEN
-        CALL read_rec(dr2, iter0, npe, dvscfin, dvscfins, drhoscfh, dbecsum)
-        IF (convt) THEN
-           CALL PAW_dpotential(dbecsum,rho%bec,int3_paw,npe)
-        ELSE
-           CALL setmixout(dfftp%nnr*nspin_mag,&
-           (nhm*(nhm+1)*nat*nspin_mag)/2,mixin,dvscfin,dbecsum,ndim,-1)
-        ENDIF
-     ELSE
-        CALL read_rec(dr2, iter0, npe, dvscfin, dvscfins, drhoscfh)
-     ENDIF
-     rec_code=0
-  else
-    iter0 = 0
-    convt =.FALSE.
-    where_rec='no_recover'
-  endif
+  iter0 = 0
+  convt =.FALSE.
+  where_rec='no_recover'
 
   IF (ionode .AND. fildrho /= ' ') THEN
      INQUIRE (UNIT = iudrho, OPENED = exst)
@@ -227,7 +211,7 @@ SUBROUTINE solve_linter (drhoscf)
 
      lintercall = 0
      drhoscf(:,:) = (0.d0, 0.d0)
-     dbecsum(:,:,:,:) = (0.d0, 0.d0)
+     dbecsum(:,:,:) = (0.d0, 0.d0)
      IF (noncolin) dbecsum_nc = (0.d0, 0.d0)
      !
      if (nksq.gt.1) rewind (unit = iunigk)
@@ -383,10 +367,10 @@ SUBROUTINE solve_linter (drhoscf)
            weight = wk (ikk)
            IF (noncolin) THEN
               call incdrhoscf_nc(drhoscf(1,1),weight,ik, &
-                                 dbecsum_nc(1,1,1,1,1), dpsi)
+                                 dbecsum_nc(1,1,1,1), dpsi)
            ELSE
               call incdrhoscf (drhoscf(1,current_spin), weight, ik, &
-                            dbecsum(1,1,current_spin,ipert), dpsi)
+                               dbecsum(1,1,current_spin), dpsi)
            END IF
      enddo! on k-points
 #ifdef __MPI
@@ -403,9 +387,7 @@ SUBROUTINE solve_linter (drhoscf)
 
      if (doublegrid) then
         do is = 1, nspin_mag
-           do ipert = 1, npe
               call cinterpolate (drhoscfh(1,is), drhoscf(1,is), 1)
-           enddo
         enddo
      else
         call zcopy (nspin_mag*dfftp%nnr, drhoscf, 1, drhoscfh, 1)
@@ -413,18 +395,17 @@ SUBROUTINE solve_linter (drhoscf)
      !
      !In the noncolinear, spin-orbit case rotate dbecsum
      !HL might also need this in set_int12
-     IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum, 1)
+     IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum)
      !
      !  Now we compute for all perturbations the total charge and potential
      !
-     call addusddens (drhoscfh, dbecsum, 1, 1, 0)
+     call addusddens (drhoscfh, dbecsum, 0)
 #ifdef __MPI
      !
      !   Reduce the delta rho across pools
      !
      call mp_sum ( drhoscf, inter_pool_comm )
      call mp_sum ( drhoscfh, inter_pool_comm )
-     IF (okpaw) call mp_sum ( dbecsum, inter_pool_comm )
 #endif
 
      !
@@ -456,9 +437,7 @@ SUBROUTINE solve_linter (drhoscf)
      !   ... save them on disk and
      !   compute the corresponding change in scf potential
      !
-     if (fildrho.ne.' ') then 
-        call davcio_drho (drhoscfh(1,1), lrdrho, iudrho, imode0+ipert, +1)
-     endif
+
      call zcopy (dfftp%nnr*nspin_mag, drhoscfh(1,1), 1, dvscfout(1,1), 1)
      call dv_of_drho (dvscfout(1,1), .false.)
      !
@@ -473,22 +452,11 @@ SUBROUTINE solve_linter (drhoscf)
      CALL check_all_convt(convt)
 
      if (doublegrid) then
-        do ipert = 1, npe
-           do is = 1, nspin_mag
-              call cinterpolate (dvscfin(1,is), dvscfins(1,is), -1)
-           enddo
-        enddo
+         do is = 1, nspin_mag
+             call cinterpolate (dvscfin(1,is), dvscfins(1,is), -1)
+         enddo
      endif
-!
-!   calculate here the change of the D1-~D1 coefficients due to the phonon
-!   perturbation
-!
-     IF (okpaw) CALL PAW_dpotential(dbecsum,rho%bec,int3_paw,npe)
-     !
-     !     with the new change of the potential we compute the integrals
-     !     of the change of potential and Q
-     !
-     !call newdq (dvscfin, npe)
+
 #ifdef __MPI
      aux_avg (1) = DBLE (ltaver)
      aux_avg (2) = DBLE (lintercall)
@@ -510,13 +478,8 @@ SUBROUTINE solve_linter (drhoscf)
      CALL flush_unit( stdout )
      !
      rec_code=10
-     IF (okpaw) THEN
-        CALL write_rec('solve_lint', irr, dr2, iter, convt, npe, &
-                                               dvscfin, drhoscfh, dbecsum)
-     ELSE
-        CALL write_rec('solve_lint', irr, dr2, iter, convt, npe, &
-                                               dvscfin, drhoscfh)
-     ENDIF
+     CALL write_rec('solve_lint', irr, dr2, iter, convt, npe, &
+                                            dvscfin, drhoscfh)
 
      if (check_stop_now()) call stop_smoothly_ph (.false.)
      if (convt) goto 155
@@ -526,13 +489,9 @@ SUBROUTINE solve_linter (drhoscf)
   !
 !HL For electric fields set drhoscf to the converged potential.
 !\epsilon^{-1} = \delta_{GG'} + \delta n_{G}(G')
-  if(do_elec) then
+!  if(do_elec) then
     drhoscf(:,:) = dvscfin(:,:)
-  endif
-  !drhoscf(:,:) = drhoscfh(:,:)
-   
-
-  if (convt.and.nlcc_any) call addnlcc (imode0, drhoscfh, npe)
+!  endif
 
   if (allocated(ldoss)) deallocate (ldoss)
   if (allocated(ldos)) deallocate (ldos)

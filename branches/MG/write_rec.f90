@@ -48,9 +48,9 @@ CONTAINS
     INTEGER, INTENT(IN) :: irr, iter, npe
     LOGICAL, INTENT(IN) :: convt
     REAL(DP), INTENT(IN) :: dr2
-    COMPLEX(DP), INTENT(IN) :: dvscfin(dfftp%nnr,nspin_mag,npe)
-    COMPLEX(DP), INTENT(IN), OPTIONAL :: drhoscfh (dfftp%nnr, nspin_mag, npe)
-    COMPLEX(DP), INTENT(IN), OPTIONAL :: dbecsum((nhm*(nhm+1))/2,nat,nspin_mag,npe)
+    COMPLEX(DP), INTENT(IN) :: dvscfin(dfftp%nnr,nspin_mag)
+    COMPLEX(DP), INTENT(IN), OPTIONAL :: drhoscfh (dfftp%nnr, nspin_mag)
+    COMPLEX(DP), INTENT(IN), OPTIONAL :: dbecsum((nhm*(nhm+1))/2,nat,nspin_mag)
 
     LOGICAL :: exst
     CALL start_clock ('write_rec')
@@ -106,10 +106,10 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iter0
     INTEGER, INTENT(IN)  :: npe
     REAL(DP), INTENT(OUT) :: dr2
-    COMPLEX(DP), INTENT(OUT) :: dvscfin (dfftp%nnr, nspin_mag, npe)
-    COMPLEX(DP), INTENT(OUT) :: dvscfins (dffts%nnr, nspin_mag, npe)
-    COMPLEX(DP), INTENT(OUT), OPTIONAL :: drhoscfh (dfftp%nnr, nspin_mag, npe)
-    COMPLEX(DP), INTENT(OUT), OPTIONAL :: dbecsum((nhm*(nhm+1))/2,nat,nspin_mag,npe)
+    COMPLEX(DP), INTENT(OUT) :: dvscfin (dfftp%nnr, nspin_mag)
+    COMPLEX(DP), INTENT(OUT) :: dvscfins (dffts%nnr, nspin_mag)
+    COMPLEX(DP), INTENT(OUT), OPTIONAL :: drhoscfh (dfftp%nnr, nspin_mag)
+    COMPLEX(DP), INTENT(OUT), OPTIONAL :: dbecsum((nhm*(nhm+1))/2,nat,nspin_mag)
 
     INTEGER :: is, ipol
     LOGICAL :: exst
@@ -127,7 +127,7 @@ CONTAINS
     IF (doublegrid) THEN
        DO is=1,nspin_mag
           DO ipol=1,npe
-             CALL cinterpolate (dvscfin(1,is,ipol), dvscfins(1,is,ipol), -1)
+             CALL cinterpolate (dvscfin(1,is), dvscfins(1,is), -1)
           END DO
        END DO
     END IF

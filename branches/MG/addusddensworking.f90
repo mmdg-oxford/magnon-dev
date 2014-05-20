@@ -7,7 +7,7 @@
 !
 !
 !----------------------------------------------------------------------
-subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
+subroutine addusddens (drhoscf, dbecsum, iflag)
   !----------------------------------------------------------------------
   !
   !  This routine adds to the change of the charge and of the
@@ -115,13 +115,7 @@ subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
   endif
 
   fact = cmplx (0.d0, - tpiba, kind=DP)
-  !HL
-  !aux(:,:,:) = (0.d0, 0.d0)
   aux(:,:) = (0.d0, 0.d0)
-
-!HL freezing modes perts
-!  npe = 1
-!HL Debug
 
   do nt = 1, ntyp
      if (upf(nt)%tvanp  ) then

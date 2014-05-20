@@ -7,7 +7,7 @@
 !
 !
 !----------------------------------------------------------------------------
-SUBROUTINE transform_dbecsum_so(dbecsum_nc,dbecsum,na,modes)
+SUBROUTINE transform_dbecsum_so(dbecsum_nc,dbecsum,na)
 !----------------------------------------------------------------------------
 !
 ! This routine multiply dbecsum_nc by the identity and the Pauli
@@ -25,8 +25,8 @@ USE spin_orb,             ONLY : fcoef, domag
 !
 IMPLICIT NONE
 
-COMPLEX(DP) :: dbecsum_nc( nhm, nhm, nat, nspin, modes)
-COMPLEX(DP) :: dbecsum( nhm*(nhm+1)/2, nat, nspin_mag, modes)
+COMPLEX(DP) :: dbecsum_nc( nhm, nhm, nat, nspin)
+COMPLEX(DP) :: dbecsum( nhm*(nhm+1)/2, nat, nspin_mag)
 INTEGER :: na, modes
 
 !
@@ -37,7 +37,6 @@ COMPLEX(DP) :: fac
 LOGICAL :: same_lj
 
 np=ityp(na)
-DO mode=1,modes
    DO ih = 1, nh(np)
       DO kh = 1, nh(np)
          IF (same_lj(kh,ih,np)) THEN
@@ -49,20 +48,20 @@ DO mode=1,modes
                      DO is1=1,npol
                         DO is2=1,npol
                            ijs=ijs+1
-                           fac=dbecsum_nc(kh,lh,na,ijs,mode)
-                           dbecsum(ijh,na,1,mode)=dbecsum(ijh,na,1,mode)+fac* &
+                           fac=dbecsum_nc(kh,lh,na,ijs)
+                           dbecsum(ijh,na,1)=dbecsum(ijh,na,1)+fac* &
                               (fcoef(kh,ih,is1,1,np)*fcoef(jh,lh,1,is2,np) + &
                                fcoef(kh,ih,is1,2,np)*fcoef(jh,lh,2,is2,np)  )
                            IF (domag) THEN
-                              dbecsum(ijh,na,2,mode)=dbecsum(ijh,na,2,mode)+ &
+                              dbecsum(ijh,na,2)=dbecsum(ijh,na,2)+ &
                                  fac * &
                                 (fcoef(kh,ih,is1,1,np)*fcoef(jh,lh,2,is2,np)+&
                                 fcoef(kh,ih,is1,2,np)*fcoef(jh,lh,1,is2,np)  )
-                              dbecsum(ijh,na,3,mode)=dbecsum(ijh,na,3,mode)+ &
+                              dbecsum(ijh,na,3)=dbecsum(ijh,na,3)+ &
                                                fac*(0.d0,-1.d0)*&
                                (fcoef(kh,ih,is1,1,np)*fcoef(jh,lh,2,is2,np) - &
                                 fcoef(kh,ih,is1,2,np)*fcoef(jh,lh,1,is2,np)  )
-                              dbecsum(ijh,na,4,mode)=dbecsum(ijh,na,4,mode) &
+                              dbecsum(ijh,na,4)=dbecsum(ijh,na,4) &
                                 + fac *     &
                                (fcoef(kh,ih,is1,1,np)*fcoef(jh,lh,1,is2,np) - &
                                 fcoef(kh,ih,is1,2,np)*fcoef(jh,lh,2,is2,np)  )
@@ -75,6 +74,5 @@ DO mode=1,modes
          END IF
       END DO
    END DO
-END DO
 RETURN
 END SUBROUTINE transform_dbecsum_so
