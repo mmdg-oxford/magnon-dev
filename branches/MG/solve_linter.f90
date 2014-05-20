@@ -185,14 +185,7 @@ SUBROUTINE solve_linter (drhoscf)
   lmetq0 = lgauss.and.lgamma
 
   if (lmetq0) then
-     allocate ( ldos ( dfftp%nnr  , nspin_mag) )
-     allocate ( ldoss( dffts%nnr , nspin_mag) )
-     IF (okpaw) THEN
-        allocate (becsum1 ( (nhm * (nhm + 1))/2 , nat , nspin_mag))
-        call localdos_paw ( ldos , ldoss , becsum1, dos_ef )
-     ELSE
         call localdos ( ldos , ldoss , dos_ef )
-     ENDIF
   endif
   !
   !
@@ -394,7 +387,7 @@ SUBROUTINE solve_linter (drhoscf)
      endif
      !
      !In the noncolinear, spin-orbit case rotate dbecsum
-     !HL might also need this in set_int12
+     !
      IF (noncolin.and.okvan) CALL set_dbecsum_nc(dbecsum_nc, dbecsum)
      !
      !  Now we compute for all perturbations the total charge and potential
@@ -411,7 +404,7 @@ SUBROUTINE solve_linter (drhoscf)
      !
      ! q=0 in metallic case deserve special care (e_Fermi can shift)
      !
-     IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
+     !IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
      !
      !   After the loop over the perturbations we have the linear change
      !   in the charge density for each mode of this representation.
@@ -486,12 +479,15 @@ SUBROUTINE solve_linter (drhoscf)
   enddo
 155 iter0=0
   !
+  !    A part of the dynamical matrix requires the integral of
+  !    the self consistent change of the potential and the variation of
+  !    the charge due to the displacement of the atoms.
+  !    We compute it here.
   !
-!HL For electric fields set drhoscf to the converged potential.
-!\epsilon^{-1} = \delta_{GG'} + \delta n_{G}(G')
-!  if(do_elec) then
+  if(do_elec) then
     drhoscf(:,:) = dvscfin(:,:)
-!  endif
+  endif
+
 
   if (allocated(ldoss)) deallocate (ldoss)
   if (allocated(ldos)) deallocate (ldos)
