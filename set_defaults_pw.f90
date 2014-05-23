@@ -91,6 +91,7 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   ! ... that are not symmetry operations of the small group of q
   !
   CALL set_small_group_of_q(nsymq,invsymq,minus_q)
+  !CALL mp_bcast (nsymq, root, world_comm)
   !
   ! ... Input k-points are assumed to be  given in the IBZ of the Bravais
   ! ... lattice, with the full point symmetry of the lattice.
@@ -110,6 +111,13 @@ SUBROUTINE setup_nscf ( newgrid, xq )
      ! In the case of electron-phonon matrix element with
      ! wannier functions the k-points should not be reduced
      !
+     print*, nk1, nk2, nk3, k1, k2,k3, nkstot
+     print*, nrot, t_rev
+     t_rev(:) = 0
+    !print*, s
+    !stop
+    !
+     skip_equivalence=.false.
      CALL kpoint_grid ( nrot, time_reversal, skip_equivalence, s, t_rev, &
                       bg, nk1*nk2*nk3, k1,k2,k3, nk1,nk2,nk3, nkstot, xk, wk)
   endif
