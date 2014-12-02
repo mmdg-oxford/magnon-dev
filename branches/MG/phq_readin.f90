@@ -18,6 +18,7 @@ SUBROUTINE phq_readin()
   !
   USE kinds,         ONLY : DP
   USE parameters,    ONLY : nsx
+  USE constants,     ONLY : RYTOEV
   USE ions_base,     ONLY : nat, ntyp => nsp
   USE io_global,     ONLY : ionode_id
   USE mp,            ONLY : mp_bcast
@@ -39,7 +40,7 @@ SUBROUTINE phq_readin()
                             nmix_ph, ldisp, recover, lrpa, lnoloc, start_irr, &
                             last_irr, start_q, last_q, current_iq, tmp_dir_ph, &
                             ext_recover, ext_restart, u_from_file, ldiag, &
-                            search_sym, lqdir, electron_phonon, do_elec
+                            search_sym, lqdir, electron_phonon, do_elec!, do_trans
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
   USE qpoint,        ONLY : nksq, xq, dbext
@@ -94,7 +95,7 @@ SUBROUTINE phq_readin()
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star, kpoints, dbext, do_elec
+                       drho_star, dvscf_star, kpoints, dbext, do_elec!, do_trans
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -141,7 +142,10 @@ SUBROUTINE phq_readin()
   ! dvscf_star%dir, dvscf_star%ext, dvscf_star%basis : see dvscf_star%open
   ! drho_star%open  : like dvscf_star%open but for drho_q
   ! drho_star%dir, drho_star%ext, drho_star%basis : see drho_star%open
-
+  
+  !KC:
+  ! dbext : for transverse perturbation with ground state magnetization along z
+  ! direction, set dbext(1)=(1, 0), dbext(2)=(0, 1), dbext(3)=(0, 0)
   IF (ionode) THEN
   !
   ! ... Input from file ?
@@ -215,10 +219,14 @@ SUBROUTINE phq_readin()
   k1       = 0
   k2       = 0
   k3       = 0
-  dbext(1) = 1.0
-  dbext(2) = 1.0
-  dbext(3) = 0.0
-  do_elec = .TRUE.
+  !dbext(1) = (1.0, 0.0)
+  !dbext(2) = (1.0, 0.0)
+  !dbext(3) = (0.0, 0.0)
+  dbext(1) = 1.d0
+  dbext(2) = 1.d0
+  dbext(3) = 0.d0
+!
+!  do_elec = .TRUE.
  ! okvan=.TRUE.
   !
   drho_star%open = .FALSE.
@@ -295,12 +303,13 @@ SUBROUTINE phq_readin()
      num_k_pts = 0
      IF (ionode) THEN
         READ (5, *, iostat = ios) card
-        print*, card
+ !       print*, card
         IF ( TRIM(card)=='K_POINTS'.OR. &
              TRIM(card)=='k_points'.OR. &
              TRIM(card)=='K_points') THEN
            READ (5, *, iostat = ios) num_k_pts
         ENDIF
+        print*, card
      ENDIF
      CALL mp_bcast(ios, ionode_id )
      CALL errore ('gwq_readin', 'reading number of kpoints', ABS(ios) )
@@ -329,8 +338,8 @@ SUBROUTINE phq_readin()
   CALL mp_bcast(xq, ionode_id )
   IF (.NOT.ldisp) THEN
      lgamma = xq (1) .EQ.0.D0.AND.xq (2) .EQ.0.D0.AND.xq (3) .EQ.0.D0
-     IF ( (epsil.OR.zue) .AND..NOT.lgamma) CALL errore ('phq_readin', &
-          'gamma is needed for elec.field', 1)
+!     IF ( (epsil.OR.zue) .AND..NOT.lgamma) CALL errore ('phq_readin', &
+!          'gamma is needed for elec.field', 1)
   ENDIF
   IF (zue.AND..NOT.trans) CALL errore ('phq_readin', 'trans must be &
        &.t. for Zue calc.', 1)
@@ -341,8 +350,8 @@ SUBROUTINE phq_readin()
   ! reads the frequencies ( just if fpol = .true. )
   !
   IF ( fpol ) THEN
-     IF ( .NOT. epsil) CALL errore ('phq_readin', &
-                                    'fpol=.TRUE. needs epsil=.TRUE.', 1 )
+!     IF ( .NOT. epsil) CALL errore ('phq_readin', &
+!                                    'fpol=.TRUE. needs epsil=.TRUE.', 1 )
      nfs=0
      IF (ionode) THEN
         READ (5, *, iostat = ios) card
@@ -351,6 +360,7 @@ SUBROUTINE phq_readin()
              TRIM(card)=='Frequencies') THEN
            READ (5, *, iostat = ios) nfs
         ENDIF
+        print*, card
      ENDIF
      CALL mp_bcast(ios, ionode_id )
      CALL errore ('phq_readin', 'reading number of FREQUENCIES', ABS(ios) )
@@ -363,6 +373,7 @@ SUBROUTINE phq_readin()
              TRIM(card) == 'Frequencies' ) THEN
            DO i = 1, nfs
               READ (5, *, iostat = ios) fiu(i)
+              fiu(i)=fiu(i)/RYTOEV/1000.d0
            END DO
         END IF
      END IF
@@ -373,6 +384,7 @@ SUBROUTINE phq_readin()
      nfs=0
      fiu=0.0_DP
   END IF
+
 
   !
   !

@@ -90,6 +90,7 @@ MODULE qpoint
   ! the index of k+q point in the list of k
   REAL (DP) :: xq(3)
   REAL (DP) :: dbext(3)
+  !COMPLEX (DP) :: dbext(3)
   ! the coordinates of the q point
   COMPLEX (DP), ALLOCATABLE :: eigqts(:) ! nat)
   ! the phases associated to the q
@@ -335,6 +336,7 @@ MODULE control_ph
              all_done, &      ! if .TRUE. all representations have been done
              newgrid=.FALSE., & ! if .TRUE. use new k-point grid nk1,nk2,nk3
              do_elec
+
   !
 END MODULE control_ph
 !

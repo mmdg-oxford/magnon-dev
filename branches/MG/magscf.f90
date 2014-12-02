@@ -22,7 +22,7 @@ SUBROUTINE magscf
   USE fft_base,   ONLY : dfftp
   USE uspp,  ONLY: okvan
   USE efield_mod, ONLY : zstarue0, zstarue0_rec
-  USE control_ph, ONLY : zue, convt, rec_code, do_elec
+  USE control_ph, ONLY : zue, convt, rec_code, do_elec!, do_trans
   USE partial,    ONLY : done_irr, comp_irr
   USE modes,      ONLY : nirr, npert, npertx
   USE phus,       ONLY : int3, int3_nc, int3_paw
@@ -37,10 +37,11 @@ SUBROUTINE magscf
 
   USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
   USE mp,         ONLY : mp_sum
+  USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
 
   IMPLICIT NONE
 
-  INTEGER :: irr, irr1, imode0, npe, ig
+  INTEGER :: irr, irr1, imode0, npe, ig,iw
   ! counter on the representations
   ! counter on the representations
   ! counter on the modes
@@ -63,38 +64,45 @@ SUBROUTINE magscf
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
 
-        CALL solve_linter (drhoscfs(1,1))
-      
-        WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
-        WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
-        WRITE( stdout, '(/,5x,"X_[G](Gp)")')
-        WRITE( stdout, '("charge density response ")')
-        WRITE( stdout, *)
-
-
-        write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
-
-        do ig=1, nspin_mag
-           CALL fwfft ('Smooth', drhoscfs(:,ig), dffts)
+        do iw =1, nfs
+                CALL solve_linter (drhoscfs(1,1), iw)
+                WRITE( stdout,'(/,5x,"frequency = ", f12.5)'),real(fiu(iw))
+                WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
+                WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
+                WRITE( stdout, '(/,5x,"X_[G](Gp)")')
+                WRITE( stdout, '("charge density response ")')
+                WRITE( stdout, *)
+                write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
+                do ig=1, nspin_mag
+                   CALL fwfft ('Smooth', drhoscfs(:,ig), dffts)
+                enddo
+                WRITE( stdout, *)
+                WRITE(stdout, '("magnetization density response" )')
+                WRITE(stdout, *)
+                write(stdout,'(7f14.7)') (real(drhoscfs (ig,2)), ig = 1,7)
+                write(stdout,'(7f14.7)') (real(drhoscfs (ig,3)), ig = 1,7)
+                write(stdout,'(7f14.7)') (real(drhoscfs (ig,4)), ig = 1,7)
         enddo
-
-        WRITE( stdout, *)
-        WRITE(stdout, '("magnetization density response" )')
-        WRITE(stdout, *)
-        write(stdout,'(7f14.7)') (real(drhoscfs (ig,2)), ig = 1,7)
-        write(stdout,'(7f14.7)') (real(drhoscfs (ig,3)), ig = 1,7)
-        write(stdout,'(7f14.7)') (real(drhoscfs (ig,4)), ig = 1,7)
 
 
         WRITE(stdout, '("magnetization density response" )')
       if(do_elec) then
+!        write(stdout,*)'output3'
         write(stdout,'("eps^{-1}, "3f12.5,"  ",4f14.7)') xq(:), (1.0d0 + real(drhoscfs (1,1)))
         write(stdout,'("eps, "3f12.5,"  ",4f14.7)') xq(:), (1.0/(1.0d0 + real(drhoscfs (1,1))))
       else
+!      write(stdout,*)'output1'
 !       G=G'= (0 0 0)
         write(stdout,'("rechiq, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
         write(stdout,'("imchiq", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
       endif
+
+!      if(do_trans) then
+!      write(stdout,*)'output2'
+      WRITE(stdout, '("transverse magnetic response" )')
+      write(stdout,'("rechiq+-, "3f12.5,"  ",f14.7)') xq(:),real(drhoscfs (1,1)+drhoscfs (1,2))-aimag(drhoscfs (1,1)+drhoscfs (1,2))
+      write(stdout,'("imchiq+-", 3f12.5,"  ",f14.7)') xq(:),real(drhoscfs (1,1)+drhoscfs (1,2))+aimag(drhoscfs (1,1)+drhoscfs (1,2))
+!      end if
 
         tcpu = get_clock ('MAGNON')
         !

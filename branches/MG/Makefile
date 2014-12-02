@@ -24,6 +24,7 @@ cg_psi.o \
 ccg_psi.o \
 cgsolve_all.o \
 cgsolve_all_imfreq.o \
+cBiCG_solve.o \
 ch_psi_all.o \
 check_initial_status.o \
 check_q_points_sym.o \
@@ -59,6 +60,7 @@ io_dyn_mat_old.o \
 io_pattern.o \
 localdos.o \
 mix_pot.o \
+mix_pot_c.o \
 mode_group.o \
 newdq.o \
 openfilq.o \
