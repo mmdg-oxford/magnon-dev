@@ -7,7 +7,7 @@
 !
 !
 !-----------------------------------------------------------------------
-SUBROUTINE solve_linter (drhoscf)
+SUBROUTINE solve_linter (drhoscf, iw)
   !-----------------------------------------------------------------------
   !
   !    Driver routine for the solution of the linear system which
@@ -30,7 +30,7 @@ SUBROUTINE solve_linter (drhoscf)
   USE constants,            ONLY : degspin
   USE cell_base,            ONLY : at, tpiba2
   USE ener,                 ONLY : ef
-  USE klist,                ONLY : lgauss, degauss, ngauss, xk, wk
+  USE klist,                ONLY : lgauss, degauss, ngauss, xk, wk, nkstot
   USE gvect,                ONLY : g
   USE gvecs,                ONLY : doublegrid
   USE fft_base,             ONLY : dfftp, dffts
@@ -65,6 +65,7 @@ SUBROUTINE solve_linter (drhoscf)
   ! used oly to write the restart file
   USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm
   USE mp,                   ONLY : mp_sum
+  USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
   !
   implicit none
 
@@ -89,6 +90,8 @@ SUBROUTINE solve_linter (drhoscf)
   real(DP), external :: w0gauss, wgauss
   ! functions computing the delta and theta function
 
+
+  complex(DP), allocatable::dpsim(:,:),dpsip(:,:)
   complex(DP), allocatable, target :: dvscfin(:,:)
   ! change of the scf potential
   complex(DP), pointer :: dvscfins (:,:)
@@ -130,8 +133,12 @@ SUBROUTINE solve_linter (drhoscf)
   integer  :: iq_dummy
   real(DP) :: tcpu, get_clock ! timing variables
   character(len=256) :: filename
+  complex(DP) :: cw
+  integer::iw
+  complex(DP), allocatable :: etc(:,:)
 
-  external ch_psi_all, cg_psi
+
+  external ch_psi_all, cg_psi, cch_psi_all
   !
   IF (rec_code_read > 20 ) RETURN
 
@@ -149,9 +156,15 @@ SUBROUTINE solve_linter (drhoscf)
   else
      dvscfins => dvscfin
   endif
+ 
+  allocate (dpsip(npwx*npol, nbnd),dpsim(npwx*npol, nbnd))
+
+  
   allocate (drhoscfh ( dfftp%nnr, nspin_mag))
   allocate (dvscfout ( dfftp%nnr, nspin_mag ))
   allocate (dbecsum ( (nhm * (nhm + 1))/2 , nat , nspin_mag))
+  allocate (etc(nbnd, nkstot))
+
 
 
   IF (okpaw) THEN
@@ -193,7 +206,7 @@ SUBROUTINE solve_linter (drhoscf)
   ! to the dynamical matrix. This is a new iteration that has to
   ! start from the beginning.
   !
-  IF (iter0==-1000) iter0=0
+  IF (iter0==-1000) iter0=0     !start iteration
   !
   !   The outside loop is over the iterations
   !
@@ -204,6 +217,7 @@ SUBROUTINE solve_linter (drhoscf)
 
      lintercall = 0
      drhoscf(:,:) = (0.d0, 0.d0)
+!mark     drhoscfh(:,:)  = (0.d0, 0.d0) 
      dbecsum(:,:,:) = (0.d0, 0.d0)
      IF (noncolin) dbecsum_nc = (0.d0, 0.d0)
      !
@@ -265,8 +279,8 @@ SUBROUTINE solve_linter (drhoscf)
         !
         ! diagonal elements of the unperturbed hamiltonian
         !
-           mode =1
-           nrec = ik
+!           mode =1
+           nrec = ik         ! record position
            !
            !  and now adds the contribution of the self consistent term
            !
@@ -312,11 +326,11 @@ SUBROUTINE solve_linter (drhoscf)
               !
               ! starting value for delta_psi is read from iudwf
               !
-              call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
+!              call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
 
 !For frequency dependent case we will require two more wave functions
-!              call davcio ( dpsip, lrdwf, iudwfp, nrec1, -1)
-!              call davcio ( dpsim, lrdwf, iudwfm, nrec1, -1)
+              call davcio ( dpsip, lrdwf, iudwf, nrec, -1)
+              call davcio ( dpsim, lrdwf, iudwf, nrec, -1)
 
               !
               ! threshold for iterative solution of the linear system
@@ -327,7 +341,10 @@ SUBROUTINE solve_linter (drhoscf)
               !  At the first iteration dpsi and dvscfin are set to zero
               !
               dpsi(:,:) = (0.d0, 0.d0)
+              dpsim(:,:)     = (0.d0, 0.d0)
+              dpsip(:,:)     = (0.d0, 0.d0)
               dvscfin (:, :) = (0.d0, 0.d0)
+              dvscfout(:, :) = (0.d0, 0.d0)
               !
               ! starting threshold for iterative solution of the linear system
               !
@@ -339,11 +356,31 @@ SUBROUTINE solve_linter (drhoscf)
            ! dvpsi=-P_c^+ (dvbare+dvscf)*psi , dvscf fixed.
            !
            conv_root = .true.
+           etc(:,:) = CMPLX( et(:,:), 0.0d0 , kind=DP)
+           cw = fiu(iw)
 
-           call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsi, &
+           !if(real(fiu(iw)).eq.0.0d0.and.aimag(fiu(iw)).eq.0.0d0)
+           if(iw.eq.1) then
+           call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsip, &
                              h_diag, npwx, npwq, thresh, ik, lter, conv_root, &
                              anorm, nbnd_occ(ikk), npol )
+                dpsim(:,:) = dpsip(:,:)
+                dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
 
+           else
+!               write(stdout,*)'cbcg_solve_start'
+              !cw = (0.01d0, 0.01)
+               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsip, h_diag, &
+                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.)
+
+               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsim, h_diag, &
+                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, -cw, .true.)
+               dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:) ) 
+!               write(stdout,*)'cbcg_solve_end'
+           endif
+                   
+
+!           write(stdout,*)'cbcg_solve_end'
            ltaver = ltaver + lter
            lintercall = lintercall + 1
            if (.not.conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
@@ -353,7 +390,8 @@ SUBROUTINE solve_linter (drhoscf)
            ! writes delta_psi on iunit iudwf, k=kpoint,
            !
            !               if (nksq.gt.1 .or. npert(irr).gt.1)
-           call davcio (dpsi, lrdwf, iudwf, nrec, + 1)
+           call davcio (dpsim, lrdwf, iudwf, nrec, + 1)
+           call davcio (dpsip, lrdwf, iudwf, nrec, + 1)
            !
            ! calculates dvscf, sum over k => dvscf_q_ipert
            !
@@ -393,6 +431,9 @@ SUBROUTINE solve_linter (drhoscf)
      !  Now we compute for all perturbations the total charge and potential
      !
      call addusddens (drhoscfh, dbecsum, 0)
+!HL compare dvscfout
+     print*, sum(dvscfout)
+
 #ifdef __MPI
      !
      !   Reduce the delta rho across pools
@@ -404,7 +445,7 @@ SUBROUTINE solve_linter (drhoscf)
      !
      ! q=0 in metallic case deserve special care (e_Fermi can shift)
      !
-     !IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
+     IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
      !
      !   After the loop over the perturbations we have the linear change
      !   in the charge density for each mode of this representation.
@@ -436,9 +477,16 @@ SUBROUTINE solve_linter (drhoscf)
      !
      !   And we mix with the old potential
      !
-        call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
+      if(iw.eq.1)then
+      call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
                          alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                          nmix_ph, flmixdpot, convt)
+      else
+      call mix_potential_c(dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
+                             alpha_mix(kter), dr2, tr2_ph/npol, iter, &
+                             nmix_ph, convt)
+      end if
+
         if (lmetq0.and.convt) &
             call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
      ! check that convergent have been reached on ALL processors in this image
