@@ -373,7 +373,8 @@ MODULE units_ph
        lrbar,     & ! length of the DV_{bare}
        iuebar,    & ! unit with the part DV_{bare} for the electric field
        lrebar,    & ! length of the DV_{bare} fro the electric field
-       iudwf,     & ! unit with D psi
+       iudwfp,     & ! unit with D psip
+       iudwfm,    &  ! unit with D psim
        iupsir,    & ! unit with evc in real space
        lrdwf,     & ! length of D psi record
        iudrhous, lrdrhous, &

@@ -40,7 +40,6 @@ davcio_drho.o \
 dfile_autoname.o \
 dfile_star.o \
 dgradcorr.o \
-dielec.o \
 drhodvloc.o \
 drhodvnl.o \
 dv_of_drho.o \
@@ -72,9 +71,7 @@ phq_recover.o \
 phq_setup.o \
 phq_summary.o \
 magscf.o \
-phescf.o \
 ph_restart.o \
-polariz.o \
 print_clock_ph.o \
 prepare_q.o \
 prepare_sym_analysis.o \
@@ -102,8 +99,6 @@ setqmod.o \
 setup_dgc.o \
 sgam_ph.o \
 smallgq.o \
-solve_e.o \
-solve_e_fpol.o \
 solve_linter.o \
 star_q.o \
 stop_ph.o \
@@ -126,7 +121,6 @@ RAMANOBJS =    \
 cft_wave.o \
 psyme2.o   \
 pcgreen.o  \
-solve_e_nscf.o \
 d2mxc.o    \
 set_dvscf.o
 

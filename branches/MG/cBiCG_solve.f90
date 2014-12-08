@@ -130,17 +130,19 @@ real(DP) :: &
     ! r    = b - Ax 
     ! rt   = conjg ( r )
      if (iter .eq. 1) then
-
-        write(stdout, *)'tag-1'
-
         !r = b - A* x
         !rt = conjg (r) 
         call h_psi (ndim, dpsi, g, e, cw, ik, nbnd)
-       write(stdout, *)'tag0'
-
         do ibnd = 1, nbnd
            call zaxpy (ndim, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd), 1)
-           call zscal (ndim, (-1.0d0, 0.0d0), g(1,ibnd), 1)
+        enddo
+        IF (npol==2) THEN
+           do ibnd = 1, nbnd
+              call zaxpy (ndim, (-1.d0,0.d0), d0psi(ndmx+1,ibnd), 1, g(ndmx+1,ibnd), 1)
+           enddo
+        END IF
+        do ibnd = 1, nbnd
+           call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1)
            gt(:,ibnd) = dconjg ( g(:,ibnd) )
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
@@ -150,7 +152,6 @@ real(DP) :: &
         enddo
      endif
 
-     write(stdout, *)'tag1'
 !HL: Convergence check... 
      lbnd = 0
      do ibnd = 1, nbnd
@@ -191,7 +192,6 @@ real(DP) :: &
         endif
     enddo
 
-    write(stdout, *) 'tag2'
 !****************** THIS IS THE MOST EXPENSIVE PART**********************!
     call h_psi (ndim, hold, t, eu(1), cw, ik, lbnd)
     call h_psi (ndim, htold, tt, eu(1), dconjg(cw), ik, lbnd)
@@ -203,8 +203,8 @@ real(DP) :: &
 !alpha = <rt|rp>/<pt|q>
            call ZCOPY (ndmx*npol, g  (1, ibnd), 1, gp  (1, ibnd), 1)
            if (tprec) call cg_psi (ndmx, ndim, 1, gp(1,ibnd), h_diag(1,ibnd) )
-           a(lbnd) = ZDOTC (ndim, gt(1,ibnd), 1, gp(1,ibnd), 1)
-           c(lbnd) = ZDOTC (ndim, ht(1,ibnd), 1, t (1,lbnd), 1)
+           a(lbnd) = ZDOTC (ndmx*npol, gt(1,ibnd), 1, gp(1,ibnd), 1)
+           c(lbnd) = ZDOTC (ndmx*npol, ht(1,ibnd), 1, t (1,lbnd), 1)
        endif
     enddo
 
@@ -214,7 +214,7 @@ real(DP) :: &
            lbnd=lbnd+1 
            alpha = a(lbnd) / c(lbnd)
 ! x  = x  + alpha        * p
-           call ZAXPY (ndmx*npol,  alpha,        h(1,ibnd), 1, dpsi(1,ibnd), 1)
+           call ZAXPY (ndmx*npol,  alpha,  h(1,ibnd), 1, dpsi(1,ibnd), 1)
 !HLTIL
 ! xt  = xt  + conjg(alpha) * pt
 !           call ZAXPY (ndmx*npol,  dconjg(alpha), ht(1,ibnd), 1, dpsitil(1,ibnd), 1)
@@ -228,8 +228,8 @@ real(DP) :: &
 ! rtp = inv(M) * rt
            call ZCOPY (ndmx*npol, g  (1, ibnd), 1, gp  (1, ibnd), 1)
            call ZCOPY (ndmx*npol, gt (1, ibnd), 1, gtp (1, ibnd), 1)
-           if (tprec) call cg_psi (ndmx, ndmx*npol, 1, gp  (1,ibnd), h_diag(1,ibnd) )
-           if (tprec) call cg_psi (ndmx, ndmx*npol, 1, gtp (1,ibnd), h_diag(1,ibnd) )
+           if (tprec) call cg_psi (ndmx, ndim, 1, gp  (1,ibnd), h_diag(1,ibnd) )
+           if (tprec) call cg_psi (ndmx, ndim, 1, gtp (1,ibnd), h_diag(1,ibnd) )
 ! beta = - <qt|rp>/<pt|q>
            a(lbnd) = ZDOTC (ndmx*npol, tt(1,lbnd), 1, gp(1,ibnd), 1)
            beta = - a(lbnd) / c(lbnd)

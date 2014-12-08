@@ -18,7 +18,7 @@ SUBROUTINE close_phq( flag )
   USE paw_variables, ONLY : okpaw
   USE io_global,     ONLY : ionode, stdout
   USE uspp,          ONLY : okvan
-  USE units_ph,      ONLY : iuwfc, iudwf, iubar, iudrhous, iuebar, iudrho, &
+  USE units_ph,      ONLY : iuwfc, iudwfp, iudwfm, iubar, iudrhous, iuebar, iudrho, &
                             iudvscf, iucom, iudvkb3, iuint3paw
   USE control_ph,    ONLY : zue, epsil
   USE output,        ONLY : fildrho, fildvscf
@@ -42,8 +42,13 @@ SUBROUTINE close_phq( flag )
   END IF
   !
   IF (flag) THEN
-     INQUIRE( UNIT=iudwf, OPENED=opnd ) 
-     IF (opnd) CLOSE( UNIT = iudwf, STATUS = 'DELETE' )
+     
+
+     INQUIRE( UNIT=iudwfp, OPENED=opnd ) 
+     IF (opnd) CLOSE( UNIT = iudwfp, STATUS = 'DELETE' )
+     INQUIRE( UNIT=iudwfm, OPENED=opnd )
+     IF (opnd) CLOSE( UNIT = iudwfm, STATUS = 'DELETE' )
+
      INQUIRE( UNIT=iubar, OPENED=opnd ) 
      IF (opnd)  CLOSE( UNIT = iubar, STATUS = 'DELETE' )
      !
@@ -63,8 +68,13 @@ SUBROUTINE close_phq( flag )
         ENDIF
      ENDIF
   ELSE
-     INQUIRE( UNIT=iudwf, OPENED=opnd ) 
-     IF (opnd) CLOSE( UNIT = iudwf, STATUS = 'KEEP' )
+!     INQUIRE( UNIT=iudwf, OPENED=opnd ) 
+!     IF (opnd) CLOSE( UNIT = iudwf, STATUS = 'KEEP' )
+     INQUIRE( UNIT=iudwfp, OPENED=opnd )
+     IF (opnd) CLOSE( UNIT = iudwfp, STATUS = 'DELETE' )
+     INQUIRE( UNIT=iudwfm, OPENED=opnd )
+     IF (opnd) CLOSE( UNIT = iudwfm, STATUS = 'DELETE' )
+
      INQUIRE( UNIT=iubar, OPENED=opnd ) 
      IF (opnd) CLOSE( UNIT = iubar, STATUS = 'KEEP' )
      !
