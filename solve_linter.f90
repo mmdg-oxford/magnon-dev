@@ -49,7 +49,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover, do_elec
   USE nlcc_ph,              ONLY : nlcc_any
-  USE units_ph,             ONLY : iudrho, lrdrho, iudwf, lrdwf, iubar, lrbar, &
+  USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
                                    this_pcxpsi_is_on_file
   USE output,               ONLY : fildrho, fildvscf
@@ -329,8 +329,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !              call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
 
 !For frequency dependent case we will require two more wave functions
-              call davcio ( dpsip, lrdwf, iudwf, nrec, -1)
-              call davcio ( dpsim, lrdwf, iudwf, nrec, -1)
+              call davcio ( dpsip, lrdwf, iudwfp, nrec, -1)
+              call davcio ( dpsim, lrdwf, iudwfm, nrec, -1)
 
               !
               ! threshold for iterative solution of the linear system
@@ -370,11 +370,13 @@ SUBROUTINE solve_linter (drhoscf, iw)
            else
 !               write(stdout,*)'cbcg_solve_start'
               !cw = (0.01d0, 0.01)
+              cw = (0.0d0, 0.d0)
                call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsip, h_diag, &
                      npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.)
 
                call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsim, h_diag, &
                      npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, -cw, .true.)
+
                dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:) ) 
 !               write(stdout,*)'cbcg_solve_end'
            endif
@@ -386,12 +388,16 @@ SUBROUTINE solve_linter (drhoscf, iw)
            if (.not.conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
                 &              " solve_linter: root not converged ",e10.3)') &
                 &              ik , ibnd, anorm
+!           if (conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
+!                &              " solve_linter: root converged ",e10.3)') &
+!                &              ik , ibnd, anorm
+
            !
            ! writes delta_psi on iunit iudwf, k=kpoint,
            !
            !               if (nksq.gt.1 .or. npert(irr).gt.1)
-           call davcio (dpsim, lrdwf, iudwf, nrec, + 1)
-           call davcio (dpsip, lrdwf, iudwf, nrec, + 1)
+           call davcio (dpsim, lrdwf, iudwfp, nrec, + 1)
+           call davcio (dpsip, lrdwf, iudwfm, nrec, + 1)
            !
            ! calculates dvscf, sum over k => dvscf_q_ipert
            !
@@ -432,7 +438,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !
      call addusddens (drhoscfh, dbecsum, 0)
 !HL compare dvscfout
-     print*, sum(dvscfout)
+!     print*, sum(dvscfout)
 
 #ifdef __MPI
      !

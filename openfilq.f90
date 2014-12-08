@@ -14,7 +14,7 @@ SUBROUTINE openfilq()
   !
   USE kinds,           ONLY : DP
   USE control_flags,   ONLY : modenum
-  USE units_ph,        ONLY : iuwfc, iudwf, iubar, iucom, iudvkb3, &
+  USE units_ph,        ONLY : iuwfc, iudwfp,iudwfm, iubar, iucom, iudvkb3, &
                               iudrhous, iuebar, iudrho, iudyn, iudvscf, &
                               lrwfc, lrdwf, lrbar, lrcom, lrdvkb3, &
                               lrdrhous, lrebar, lrdrho, lint3paw, iuint3paw
@@ -88,11 +88,22 @@ SUBROUTINE openfilq()
   !
   !    The file with the solution delta psi
   !
-  iudwf = 22
+  iudwfp = 22
+  iudwfm= 28
+!  iudwf = 29
   lrdwf = 2 * nbnd * npwx * npol
-  CALL diropn (iudwf, 'dwf', lrdwf, exst)
+
+!  CALL diropn (iudwf, 'dwf', lrdwf, exst)
+!  IF (ext_recover.AND..NOT.exst) &
+!     CALL errore ('openfilq','file '//trim(prefix)//'.dwf not found', 1)
+
+  CALL diropn (iudwfp, 'dwfp', lrdwf, exst)
   IF (ext_recover.AND..NOT.exst) &
-     CALL errore ('openfilq','file '//trim(prefix)//'.dwf not found', 1)
+     CALL errore ('openfilq','file '//trim(prefix)//'.dwfp not found', 1)
+
+  CALL diropn (iudwfm, 'dwfm', lrdwf, exst)
+  IF (ext_recover.AND..NOT.exst) &
+     CALL errore ('openfilq','file '//trim(prefix)//'.dwfm not found', 1)
   !
   !   open a file with the static change of the charge
   !

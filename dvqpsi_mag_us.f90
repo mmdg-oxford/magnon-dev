@@ -93,7 +93,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   !aux1 (nls(1)) = 0.5*4.255d-6
   !aux1 (nls(1)) = 1.0
   !for electric field
-  aux1 (nls(1)) = dcmplx(1.0, 0.0d0)
+  aux1 (nls(1)) = dcmplx(-1.d0, 0.0d0)
   !moved into real space:
   CALL invfft ('Smooth', aux1, dffts)
   !

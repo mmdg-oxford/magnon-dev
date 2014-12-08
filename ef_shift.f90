@@ -26,7 +26,7 @@ subroutine ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, flag)
   USE qpoint,               ONLY : nksq
   USE control_ph,           ONLY : nbnd_occ, lgamma_gamma
   USE noncollin_module,     ONLY : noncolin, npol
-  USE units_ph,             ONLY : lrwfc, iuwfc, lrdwf, iudwf
+  USE units_ph,             ONLY : lrwfc, iuwfc, lrdwf
   USE eqv,                  ONLY : dpsi
   USE modes,                ONLY : npert
   USE mp_global,            ONLY : intra_pool_comm
@@ -95,47 +95,19 @@ subroutine ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, flag)
      !
      if (.not.lgamma_gamma) call sym_def (def, irr)
      WRITE( stdout, '(5x,"Pert. #",i3,": Fermi energy shift (Ry) =", 2e15.4)') &
-          (ipert, def (ipert) , ipert = 1, npert (irr) )
+ !         (ipert, def (ipert) , ipert = 1, npert (irr) )
+          (ipert, def (ipert) , ipert = 1, 1 )
      !
      ! corrects the density response accordingly...
      !
-     do ipert = 1, npert (irr)
+!     do ipert = 1, npert (irr)
+     do ipert = 1, 1
         call zaxpy (dfftp%nnr*nspin_mag, def(ipert), ldos, 1, drhoscf(1,1), 1)
      enddo
   else
      !
      ! does the same for perturbed wfc
      !
-     do ik = 1, nksq
-        npw = ngk (ik)
-        !
-        ! reads unperturbed wavefuctions psi_k in G_space, for all bands
-        !
-        ikrec = ik
-        if (nksq.gt.1) call davcio (evc, lrwfc, iuwfc, ikrec, - 1)
-        !
-        ! reads delta_psi from iunit iudwf, k=kpoint
-        !
-        do ipert = 1, npert (irr)
-           nrec = (ipert - 1) * nksq + ik
-           if (nksq.gt.1.or.npert(irr).gt.1) &
-                call davcio (dpsi, lrdwf, iudwf, nrec, -1)
-           do ibnd = 1, nbnd_occ (ik)
-              wfshift = 0.5d0 * def(ipert) * &
-                   w0gauss( (ef-et(ibnd,ik))/degauss, ngauss) / degauss
-              IF (noncolin) THEN
-                 call zaxpy (npwx*npol,wfshift,evc(1,ibnd),1,dpsi(1,ibnd),1)
-              ELSE
-                 call zaxpy (npw, wfshift, evc(1,ibnd), 1, dpsi(1,ibnd), 1)
-              ENDIF
-           enddo
-           !
-           ! writes corrected delta_psi to iunit iudwf, k=kpoint,
-           !
-           if (nksq.gt.1.or.npert(irr).gt.1) &
-                call davcio (dpsi, lrdwf, iudwf, nrec, +1)
-        enddo
-     enddo
      do is = 1, nspin_mag
         call zaxpy (dffts%nnr, def(ipert), ldoss(1,is), 1, drhoscf(1,is), 1)
      enddo
