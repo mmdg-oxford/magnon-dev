@@ -19,7 +19,7 @@ SUBROUTINE magscf
   USE ions_base, ONLY : nat
   USE lsda_mod, ONLY : nspin
   USE io_global,  ONLY : stdout, ionode
-  USE fft_base,   ONLY : dfftp
+!  USE fft_base,   ONLY : dfftp
   USE uspp,  ONLY: okvan
   USE efield_mod, ONLY : zstarue0, zstarue0_rec
   USE control_ph, ONLY : zue, convt, rec_code, do_elec!, do_trans
@@ -29,7 +29,7 @@ SUBROUTINE magscf
   USE uspp_param, ONLY : nhm
   USE eqv,        ONLY : drhoscfs
   USE paw_variables, ONLY : okpaw
-  USE noncollin_module, ONLY : noncolin, nspin_mag
+  USE noncollin_module, ONLY : noncolin, nspin_mag, npol
   USE recover_mod, ONLY : write_rec
   USE qpoint,          ONLY : xq
   USE fft_base,   ONLY: dfftp, dffts
@@ -38,6 +38,7 @@ SUBROUTINE magscf
   USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
   USE mp,         ONLY : mp_sum
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
+  USE gvecs,         ONLY : doublegrid
 
   IMPLICIT NONE
 
@@ -58,16 +59,19 @@ SUBROUTINE magscf
 
   CALL start_clock ('magscf')
 
-        ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag))
+!        ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag))
+         ALLOCATE (drhoscfs( dffts%nnr , nspin_mag)) !KC
         imode0 = 0
 
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
+        WRITE( stdout, *)'npol,nspin_mag', npol, nspin_mag
+        WRITE( stdout, *)'dfftp,dffts, doublegrid', dfftp%nnr, dffts%nnr, doublegrid
 
 !        do iw =1, nfs
 do iw =1, nfs
 !                CALL solve_linter (drhoscfs(1,1), iw)
-                WRITE( stdout,'(/,5x,"frequency = ", f12.5)'),real(fiu(iw))
+                WRITE( stdout,'(/,5x,"frequency = ", 2f12.5)'), (fiu(iw))
                 WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
                 CALL solve_linter (drhoscfs(1,1), iw)
                 WRITE( stdout, '(/,5x,"End of self-consistent calculation")')
@@ -91,21 +95,25 @@ do iw =1, nfs
 !        WRITE(stdout, '("magnetization density response" )')
       if(do_elec) then
         write(stdout,*)'charge density response'
-        write(stdout,'("eps^{-1}, "3f12.5,"  ",4f14.7)') xq(:), (1.0d0 + real(drhoscfs (1,1)))
-        write(stdout,'("eps, "3f12.5,"  ",4f14.7)') xq(:), (1.0/(1.0d0 + real(drhoscfs (1,1))))
-      else
-      write(stdout,*)"density matrix response with G=G'=(0 0 0 )"
+        write(stdout,'("eps^{-1}, "3f12.5,"  ",f14.7)') xq(:), (1.0d0 + real(drhoscfs (1,1)))
+        write(stdout,'("eps, "3f12.5,"  ",f14.7)') xq(:), (1.0/(1.0d0 + real(drhoscfs (1,1))))
+        write(stdout,'("real(eps) im(eps) "4f12.5,"  ",2f14.7)') xq(:),real(fiu(iw)), real((1.0/(1.0d0 + drhoscfs (1,1)))), &
+                     aimag((1.0/(1.0d0 + drhoscfs (1,1))))
+      end if
+
+      IF (noncolin) THEN
+        write(stdout,*)"density matrix response with G=G'=(0 0 0 )"
 !       G=G'= (0 0 0)
         write(stdout,'("real drho, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
         write(stdout,'("im drho", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
-      endif
+!      endif
 
 !      if(do_trans) then
 !      write(stdout,*)'output2'
-      WRITE(stdout, '("transverse magnetic response" )')
-      write(stdout,'("w, chiq+-, "f12.5,"  ",2f14.7)') real(fiu(iw))*13600, real(drhoscfs(1,3)+drhoscfs(1,2)) &
+        WRITE(stdout, '("transverse magnetic response" )')
+        write(stdout,'("w, chiq+-, "f12.5,"  ",2f14.7)') real(fiu(iw))*13600, real(drhoscfs(1,3)+drhoscfs(1,2)) &
             -aimag(drhoscfs(1,3)-drhoscfs(1,2)), aimag(drhoscfs(1,3)+drhoscfs(1,2))+real(drhoscfs(1,3)-drhoscfs(1,2))
-                                                      
+      END IF                                                      
 !      write(stdout,'("imchiq+-", 3f12.5,"  ",f14.7)') xq(:),drhoscfs(1,3)-drhoscfs(1,2)
 !      end if
 end do

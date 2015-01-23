@@ -50,10 +50,10 @@ SUBROUTINE prepare_q(do_band, do_iq, setup_pw, iq, minq)
   ! Case 1) This q point is not calculated because not requested in this run
   !
 
-  IF ( comp_iq(iq)==0 ) THEN
-     do_iq=.FALSE.
-     RETURN
-  ENDIF
+  !IF ( comp_iq(iq)==0 ) THEN
+  !   do_iq=.FALSE.
+  !   RETURN
+  !ENDIF
   !
   !  Case 2) This q point is not calculated because it has too few 
   !          representation and the starting representation is larger 
@@ -78,7 +78,7 @@ SUBROUTINE prepare_q(do_band, do_iq, setup_pw, iq, minq)
        epsil = .FALSE.
        zue   = .FALSE.
        zeu   = .FALSE.
-       fpol  = .FALSE.
+  !     fpol  = .FALSE.
   !
   !  Save the current status of the run: all the flags, the list of q,
   !  and the current q, the fact that we are before the bands

@@ -351,10 +351,10 @@ MODULE freq_ph
   !
   LOGICAL :: fpol ! if .TRUE. dynamic dielectric constant is computed
   !
-  INTEGER, PARAMETER :: nfsmax=50  ! # of maximum frequencies
+  INTEGER, PARAMETER :: nfsmax=500  ! # of maximum frequencies
   INTEGER :: nfs                   ! # of frequencies
   !
-  REAL (KIND=DP) :: fiu(nfsmax)    ! values  of frequency
+  complex(KIND=DP) :: fiu(nfsmax)    ! values  of frequency
   !
 END MODULE freq_ph
 !

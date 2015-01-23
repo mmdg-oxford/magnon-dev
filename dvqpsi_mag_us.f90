@@ -23,7 +23,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
                         ngm
   USE gvecs,   ONLY : ngms, doublegrid, nls
   USE lsda_mod,  ONLY : lsda, isk
-  USE noncollin_module, ONLY : npol
+  USE noncollin_module, ONLY : npol, noncolin
   use uspp_param,ONLY : upf
   USE wvfct,     ONLY : nbnd, npw, npwx, igk
   USE wavefunctions_module,  ONLY: evc
@@ -93,7 +93,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   !aux1 (nls(1)) = 0.5*4.255d-6
   !aux1 (nls(1)) = 1.0
   !for electric field
-  aux1 (nls(1)) = dcmplx(-1.d0, 0.0d0)
+  aux1 (nls(1)) = dcmplx(1.d0, 0.0d0)
   !moved into real space:
   CALL invfft ('Smooth', aux1, dffts)
   !
@@ -104,40 +104,62 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   endif
 
   do ibnd = 1, nbnd
-    psic = (0.d0, 0.d0)
-    aux2 = (0.d0, 0.d0)
+       psic = (0.d0, 0.d0)
+       aux2 = (0.d0, 0.d0)
+     
+       do ip=1,npol
+          if(ip==1)then
+              do ig = 1, npw
+              psic (nls (igk (ig)), 1 ) = evc (ig, ibnd)
+              end do
+           else
+              do ig = 1, npw
+              psic (nls (igk (ig)), 2 ) = evc (ig+npwx, ibnd)
+              end do
+           end if
+        end do
+!    enddo
 
-    do ig = 1, npw
-       psic (nls (igk (ig)), 1 ) = evc (ig, ibnd)
-       psic (nls (igk (ig)), 2 ) = evc (ig+npwx, ibnd)
-    enddo
-
-    CALL invfft ('Wave', psic(:,1), dffts)
-    CALL invfft ('Wave', psic(:,2), dffts)
+    do ip=1,npol
+       if(ip==1)then 
+       CALL invfft ('Wave', psic(:,1), dffts)
+       else
+       CALL invfft ('Wave', psic(:,2), dffts)
+       end if
+     end do
 
 !For electric field perturbation couples directly to wave functions.
    if(do_elec) then
-        do ir = 1, dffts%nnr
-          aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
-          aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
-        enddo
-   else
+      do ip=1,npol
+        if(ip==1)then 
+           do ir = 1, dffts%nnr
+              aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+           end do
+        else
+           do ir = 1, dffts%nnr
+              aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
+           end do
+        end if
+      end do 
+   else  if(noncolin)then
 !HL initial test with B_{+-}
+
+!  if(noncolin)then
 !X: \mu_b \sigma_{x}B_{x}
-    if(dbext(1).eq.1.d0) then
+!    if(dbext(1).eq.1.d0) then
         do ir = 1, dffts%nnr
           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
           aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
         enddo
-     endif
+!    endif
 
 !Y: \mu_b \sigma_{y}B_{y}
-    if(dbext(2).eq.1.d0) then
+!    if(dbext(2).eq.1.d0) then
         do ir = 1, dffts%nnr
            aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
            aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
         enddo
-    endif
+!    endif
 
 !Z: \mu_b \sigma_{z}B_{z}
     if(dbext(3).eq.1.d0) then
@@ -146,9 +168,18 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
            aux2(ir,2) = aux2(ir,2) - aux1 (ir)*psic(ir,2)
         enddo
     endif
+   
+
    endif
+
+   do ip=1,npol
+      if(ip==1)then
       CALL fwfft ('Wave', aux2(:,1), dffts)
+      else
       CALL fwfft ('Wave', aux2(:,2), dffts)
+      end if
+   enddo
+
       do ip = 1, npol
         if (ip==1) then
            do ig = 1, npwq
@@ -160,7 +191,8 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
            enddo
         end if
       enddo!npol
-    enddo!nbnd
+
+  enddo!nbnd
 !
   deallocate (psic)
   deallocate (aux1)
