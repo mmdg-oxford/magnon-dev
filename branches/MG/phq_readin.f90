@@ -46,7 +46,7 @@ SUBROUTINE phq_readin()
   USE qpoint,        ONLY : nksq, xq, dbext
   USE partial,       ONLY : atomo, nat_todo, nat_todo_input
   USE output,        ONLY : fildyn, fildvscf, fildrho
-  USE disp,          ONLY : nq1, nq2, nq3, num_k_pts, xk_kpoints, kpoints
+  USE disp,          ONLY : nq1, nq2, nq3, num_k_pts, xk_kpoints, kpoints,nqs
   USE io_files,      ONLY : tmp_dir, prefix
   USE noncollin_module, ONLY : i_cons, noncolin
   USE ldaU,          ONLY : lda_plus_u
@@ -84,6 +84,7 @@ SUBROUTINE phq_readin()
   LOGICAL                    :: nogg
   INTEGER, EXTERNAL  :: atomic_number
   REAL(DP), EXTERNAL :: atom_weight
+  REAL(DP)           :: ar, ai
   LOGICAL, EXTERNAL  :: imatches
   LOGICAL, EXTERNAL  :: has_xml
   !
@@ -226,7 +227,7 @@ SUBROUTINE phq_readin()
   dbext(2) = 1.d0
   dbext(3) = 0.d0
 !
-!  do_elec = .TRUE.
+  do_elec = .FALSE.
  ! okvan=.TRUE.
   !
   drho_star%open = .FALSE.
@@ -311,9 +312,11 @@ SUBROUTINE phq_readin()
         ENDIF
         print*, card
      ENDIF
+     
      CALL mp_bcast(ios, ionode_id )
      CALL errore ('gwq_readin', 'reading number of kpoints', ABS(ios) )
      CALL mp_bcast(num_k_pts, ionode_id )
+     nqs=num_k_pts
      if (num_k_pts > 30) call errore('mag_readin','Too many k-points',1) 
      if (num_k_pts < 1) call errore('mag_readin','Too few kpoints',1) 
      IF (ionode) THEN
@@ -350,8 +353,6 @@ SUBROUTINE phq_readin()
   ! reads the frequencies ( just if fpol = .true. )
   !
   IF ( fpol ) THEN
-!     IF ( .NOT. epsil) CALL errore ('phq_readin', &
-!                                    'fpol=.TRUE. needs epsil=.TRUE.', 1 )
      nfs=0
      IF (ionode) THEN
         READ (5, *, iostat = ios) card
@@ -360,7 +361,6 @@ SUBROUTINE phq_readin()
              TRIM(card)=='Frequencies') THEN
            READ (5, *, iostat = ios) nfs
         ENDIF
-        print*, card
      ENDIF
      CALL mp_bcast(ios, ionode_id )
      CALL errore ('phq_readin', 'reading number of FREQUENCIES', ABS(ios) )
@@ -372,8 +372,8 @@ SUBROUTINE phq_readin()
              TRIM(card) == 'frequencies' .OR. &
              TRIM(card) == 'Frequencies' ) THEN
            DO i = 1, nfs
-              READ (5, *, iostat = ios) fiu(i)
-              fiu(i)=fiu(i)/RYTOEV/1000.d0
+              READ (5, *, iostat = ios) ar, ai
+              fiu(i)=dcmplx(ar, ai)/RYTOEV/1000.d0
            END DO
         END IF
      END IF

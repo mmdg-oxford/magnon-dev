@@ -130,8 +130,8 @@ SUBROUTINE check_initial_status(auxdyn)
         !
      ELSE
         !
-        nqs = 1
-        last_q = 1
+!        nqs = 1
+        last_q = nqs
         ALLOCATE(x_q(3,1))
         x_q(:,1)=xq(:)
         !

@@ -47,8 +47,8 @@ PROGRAM magnon
   ! [10] ?  + nonperiodic boundary conditions.
 
   USE io_global,       ONLY : stdout
-  USE disp,            ONLY : nqs, num_k_pts
-  USE control_ph,      ONLY : epsil, trans, bands_computed
+  USE disp,            ONLY : nqs, num_k_pts, xk_kpoints, comp_iq
+  USE control_ph,      ONLY : epsil, trans, bands_computed,lgamma
   USE output,          ONLY : fildrho
   USE check_stop,      ONLY : check_stop_init
   USE ph_restart,      ONLY : ph_writefile, destroy_status_run
@@ -56,11 +56,13 @@ PROGRAM magnon
   USE mp_global,       ONLY: mp_startup, nimage
   USE image_io_routines, ONLY : io_image_start
   USE environment,     ONLY: environment_start
+  USE qpoint, ONLY:xq
+  USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
 
   !
   IMPLICIT NONE
   !
-  INTEGER :: iq
+  INTEGER :: iq,iq1,i
   LOGICAL :: do_band, do_iq, setup_pw
   CHARACTER (LEN=9)   :: code = 'MAGNON'
   CHARACTER (LEN=256) :: auxdyn
@@ -79,7 +81,16 @@ PROGRAM magnon
   !
   WRITE(stdout, '(/5x, "Reading variables")') 
   CALL phq_readin()
+  
+  !do iq=1, num_k_pts
+  !WRITE(stdout,*)xk_kpoints(1,iq), xk_kpoints(2,iq), xk_kpoints(3,iq)
+  !end do 
   WRITE(stdout, '(/5x, "Finished reading variables")') 
+  WRITE(stdout, '(7x, "Imag. Frequencies: ")')
+  DO i = 1, nfs
+       WRITE(stdout,'(8x, i4, 4x, 2f9.4)')i, fiu(i)*13.605
+  ENDDO
+
   !
   CALL check_stop_init()
   !
@@ -87,14 +98,26 @@ PROGRAM magnon
   ! ... the q mesh
   !
   CALL check_initial_status(auxdyn)
+! WRITE(stdout,*)'xq'
+! WRITE(stdout,*)xq
+! WRITE(stdout,*)'lgamma',lgamma
+
+  WRITE(stdout,*)'comp_iq'
+  do iq=1, num_k_pts
+  WRITE(stdout,*)comp_iq(iq)
+  end do
   !
   !DO iq = 1, nqs
+  
   DO iq = 1, num_k_pts
      !
      print*, "Number of qpoints to calc.", num_k_pts
+
      CALL prepare_q(do_band, do_iq, setup_pw, iq)
+    ! WRITE(stdout,)
      !
      !  If necessary the bands are recalculated
+
      !
      IF (setup_pw) CALL run_pwscf(do_band)
      !
@@ -102,6 +125,7 @@ PROGRAM magnon
      !  the linear response of the system
      !
      CALL initialize_ph()
+
      !
      !  magnon perturbation
      !
