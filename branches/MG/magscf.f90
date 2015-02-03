@@ -38,7 +38,7 @@ SUBROUTINE magscf
   USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
   USE mp,         ONLY : mp_sum
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
-  USE gvecs,         ONLY : doublegrid
+  USE gvecs,         ONLY : doublegrid, nls  !KC
 
   IMPLICIT NONE
 
@@ -66,7 +66,7 @@ SUBROUTINE magscf
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
         WRITE( stdout, *)'npol,nspin_mag', npol, nspin_mag
-        WRITE( stdout, *)'dfftp,dffts, doublegrid', dfftp%nnr, dffts%nnr, doublegrid
+        WRITE( stdout, *)'dfftp,dffts, doublegrid,', dfftp%nnr, dffts%nnr, doublegrid
 
 !        do iw =1, nfs
 do iw =1, nfs
@@ -95,17 +95,17 @@ do iw =1, nfs
 !        WRITE(stdout, '("magnetization density response" )')
       if(do_elec) then
         write(stdout,*)'charge density response'
-        write(stdout,'("eps^{-1}, "3f12.5,"  ",f14.7)') xq(:), (1.0d0 + real(drhoscfs (1,1)))
-        write(stdout,'("eps, "3f12.5,"  ",f14.7)') xq(:), (1.0/(1.0d0 + real(drhoscfs (1,1))))
-        write(stdout,'("real(eps) im(eps) "4f12.5,"  ",2f14.7)') xq(:),real(fiu(iw)), real((1.0/(1.0d0 + drhoscfs (1,1)))), &
-                     aimag((1.0/(1.0d0 + drhoscfs (1,1))))
+        write(stdout,'("q, freq, eps^{-1}, "5f12.5,"  ",f14.7)') xq(:), fiu(iw), (1.0d0 + real(drhoscfs (1,1)))
+!        write(stdout,'("eps, "3f12.5,"  ",f14.7)') xq(:), (1.0/(1.0d0 + real(drhoscfs (1,1))))
+        write(stdout,'("q, freq, real(eps) im(eps) "5f12.5,"  ",2f14.7)') xq(:), fiu(iw), & 
+                   real((1.0/(1.0d0 + drhoscfs (1,1)))), aimag((1.0/(1.0d0 + drhoscfs (1,1))))
       end if
 
       IF (noncolin) THEN
         write(stdout,*)"density matrix response with G=G'=(0 0 0 )"
 !       G=G'= (0 0 0)
-        write(stdout,'("real drho, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (1,ig)), ig = 1,4)
-        write(stdout,'("im drho", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (1,ig)), ig = 1,4)
+        write(stdout,'("real drho, "3f12.5,"  ",4f14.7)') xq(:), (real(drhoscfs (nls(1),ig)), ig = 1,4) !KC
+        write(stdout,'("im drho", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (nls(1),ig)), ig = 1,4)  !KC
 !      endif
 
 !      if(do_trans) then
