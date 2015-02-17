@@ -27,6 +27,7 @@ SUBROUTINE apply_dpot(nrxxs, aux1, dvscfins, current_spin)
         DO ir = 1, nrxxs
            sup=aux1(ir,1)*(dvscfins(ir,1)+dvscfins(ir,4))+ &
                 aux1(ir,2)*(dvscfins(ir,2)-(0.d0,1.d0)*dvscfins(ir,3))
+
            sdwn=aux1(ir,2)*(dvscfins(ir,1)-dvscfins(ir,4)) + &
                 aux1(ir,1)*(dvscfins(ir,2)+(0.d0,1.d0)*dvscfins(ir,3))
            aux1(ir,1)=sup
