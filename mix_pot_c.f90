@@ -36,7 +36,8 @@
 
   USE kinds,       ONLY : DP 
  ! USE control_gw,  ONLY : nmix_gw
-
+  USE mp_global,       ONLY : intra_pool_comm
+  USE mp,              ONLY : mp_sum
 
   !max number of iterations used in mixing: n_iter must be.le.maxter
   implicit none
@@ -83,6 +84,9 @@
   ndimtot = ndim
   dr2 = (sqrt (dr2) / ndimtot) **2
   !
+  call mp_sum (dr2, intra_pool_comm)
+  call mp_sum (ndimtot, intra_pool_comm)
+  !
   conv = dr2.lt.tr2
   !
   if (iter.eq.1) then
@@ -112,6 +116,7 @@
         dv (n, ipos) = vin (n) - dv (n, ipos)
      enddo
      norm = (DZNRM2 (ndim, df (1, ipos), 1) ) **2
+     call mp_sum (norm, intra_pool_comm)
      norm = sqrt (norm)
      call ZSCAL (ndim, dcmplx ( 1.d0 / norm, 0.d0), df (1, ipos), 1)
      call ZSCAL (ndim, dcmplx ( 1.d0 / norm, 0.d0), dv (1, ipos), 1)
@@ -122,6 +127,7 @@
   do i = 1, iter_used
      do j = i + 1, iter_used
         beta (i, j) = w (i) * w (j)  * ZDOTC (ndim, df (1, j), 1, df (1, i), 1)
+        call mp_sum ( beta (i, j), intra_pool_comm )
      enddo
      beta (i, i) = w0**2 + w (i) **2
   enddo
@@ -143,6 +149,7 @@
   do i = 1, iter_used
      work (i) = ZDOTC (ndim, df (1, i), 1, vout, 1)
   enddo
+call mp_sum ( work(1:iter_used), intra_pool_comm )
 !
   do n = 1, ndim
      vin (n) = vin (n) + dcmplx(alphamix, 0.00) * vout (n) 

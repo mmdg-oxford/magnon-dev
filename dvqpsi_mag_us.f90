@@ -146,20 +146,20 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
 
 !  if(noncolin)then
 !X: \mu_b \sigma_{x}B_{x}
-!    if(dbext(1).eq.1.d0) then
+    if(dbext(1).eq.1.d0) then
         do ir = 1, dffts%nnr
           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,2)
           aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,1)
         enddo
-!    endif
+    endif
 
 !Y: \mu_b \sigma_{y}B_{y}
-!    if(dbext(2).eq.1.d0) then
+    if(dbext(2).eq.1.d0) then
         do ir = 1, dffts%nnr
            aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*psic(ir,2)
            aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*psic(ir,1)
         enddo
-!    endif
+    endif
 
 !Z: \mu_b \sigma_{z}B_{z}
     if(dbext(3).eq.1.d0) then

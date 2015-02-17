@@ -54,7 +54,7 @@ subroutine bcast_ph_input ( )
   call mp_bcast (ldiag, ionode_id )
   call mp_bcast (lqdir, ionode_id )
   call mp_bcast (search_sym, ionode_id)
-
+  call mp_bcast (lgamma, ionode_id )
   call mp_bcast (do_elec, ionode_id)
 
   !mag stuff

@@ -26,7 +26,7 @@ subroutine deallocate_phq
                     vsgga, segni
   USE gamma_gamma, ONLY : with_symmetry, has_equivalent, equiv_atoms, &
                    n_equiv_atoms
-  USE eqv,     ONLY : dmuxc, vlocq, dpsi, dvpsi, evq, eprec
+  USE eqv,     ONLY : dmuxc, vlocq, dpsi, dvpsi, evq, eprec, dpsip, dpsim
   USE nlcc_ph, ONLY : drc
   USE units_ph, ONLY : this_dvkb3_is_on_file, this_pcxpsi_is_on_file
   USE dynmat, ONLY : dyn00, dyn_rec, dyn, w2
@@ -45,6 +45,8 @@ subroutine deallocate_phq
 
   if(allocated(dvpsi)) deallocate (dvpsi)
   if(allocated(dpsi)) deallocate ( dpsi)
+  if(allocated(dpsip)) deallocate ( dpsip)
+  if(allocated(dpsim)) deallocate ( dpsim)
   !
   if(allocated(vlocq)) deallocate (vlocq)
   if(allocated(dmuxc)) deallocate (dmuxc)

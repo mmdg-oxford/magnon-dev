@@ -13,6 +13,8 @@ SUBROUTINE cbcg_solve(h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
 
 USE kinds,       ONLY: DP
 !USE control_gw,  ONLY: maxter_green
+USE mp_global,      ONLY : intra_pool_comm
+USE mp,             ONLY : mp_sum
 USE io_global,            ONLY : stdout, ionode
 
 implicit none
@@ -158,7 +160,7 @@ real(DP) :: &
         if (conv (ibnd).eq.0) then
             lbnd = lbnd+1
 !            rho(lbnd) = abs(ZDOTC (ndim, g(1,ibnd), 1, g(1,ibnd), 1))
-            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
+              rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
 !           trick where we truncate early.
 !           rho(lbnd) = abs(ZDOTC (ngmpol, g(1,ibnd), 1, g(1,ibnd), 1))
         endif
@@ -208,6 +210,11 @@ real(DP) :: &
            c(lbnd) = ZDOTC (ndmx*npol, ht(1,ibnd), 1, t (1,lbnd), 1)
        endif
     enddo
+
+#ifdef __MPI          
+     call mp_sum(  a(1:lbnd), intra_pool_comm )
+     call mp_sum(  c(1:lbnd), intra_pool_comm )
+#endif
 
      lbnd=0
      do ibnd = 1, nbnd

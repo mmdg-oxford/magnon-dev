@@ -223,8 +223,8 @@ SUBROUTINE phq_readin()
   !dbext(1) = (1.0, 0.0)
   !dbext(2) = (1.0, 0.0)
   !dbext(3) = (0.0, 0.0)
-  dbext(1) = 1.d0
-  dbext(2) = 1.d0
+  dbext(1) = 0.d0
+  dbext(2) = 0.d0
   dbext(3) = 0.d0
 !
   do_elec = .FALSE.
@@ -336,14 +336,16 @@ SUBROUTINE phq_readin()
      num_k_pts = 1
  ENDIF
 
-  CALL mp_bcast(ios, ionode_id)
-  CALL errore ('phq_readin', 'reading xq', ABS (ios) )
-  CALL mp_bcast(xq, ionode_id )
-  IF (.NOT.ldisp) THEN
-     lgamma = xq (1) .EQ.0.D0.AND.xq (2) .EQ.0.D0.AND.xq (3) .EQ.0.D0
+! KC 
+!  CALL mp_bcast(ios, ionode_id)
+!  CALL errore ('phq_readin', 'reading xq', ABS (ios) )
+!  CALL mp_bcast(xq, ionode_id )
+!  IF (.NOT.ldisp) THEN
+!     lgamma = xq (1) .EQ.0.D0.AND.xq (2) .EQ.0.D0.AND.xq (3) .EQ.0.D0
 !     IF ( (epsil.OR.zue) .AND..NOT.lgamma) CALL errore ('phq_readin', &
 !          'gamma is needed for elec.field', 1)
-  ENDIF
+!  ENDIF
+
   IF (zue.AND..NOT.trans) CALL errore ('phq_readin', 'trans must be &
        &.t. for Zue calc.', 1)
 
@@ -421,13 +423,17 @@ SUBROUTINE phq_readin()
   ENDIF
 1001 CONTINUE
 
-  CALL read_file ( )
+
+  CALL read_file_mag ()
+
   !
   ! init_start_grid returns .true. if a new k-point grid is set from values
   ! read from input (this happens if nk1*nk2*nk3, else it returns .false.,
   ! leaves the current values, as read in read_file, unchanged)
   !
-  newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3) 
+  newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
+
+ 
   !
   tmp_dir=tmp_dir_save
   !
