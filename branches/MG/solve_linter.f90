@@ -444,8 +444,6 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !  Now we compute for all perturbations the total charge and potential
      !
      call addusddens (drhoscfh, dbecsum, 0)
-!HL compare dvscfout
-!     print*, sum(dvscfout)
 
 #ifdef __MPI
      !
