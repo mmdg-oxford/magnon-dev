@@ -84,6 +84,7 @@ punch_plot_e.o \
 q_points.o \
 q2qstar_ph.o \
 qdipol_cryst.o \
+read_file_mag.o \
 random_matrix.o \
 read_wfc_rspace_and_fwfft.o \
 rotate_dvscf_star.o \

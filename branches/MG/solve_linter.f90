@@ -54,7 +54,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    this_pcxpsi_is_on_file
   USE output,               ONLY : fildrho, fildvscf
   USE phus,                 ONLY : int3_paw, becsumort
-  USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec
+  USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec, dpsip,dpsim
   USE qpoint,               ONLY : xq, npwq, igkq, nksq, ikks, ikqs
   USE modes,                ONLY : npertx, npert, u, t, irotmq, tmq, &
                                    minus_q, nsymq, rtau
@@ -92,7 +92,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   ! functions computing the delta and theta function
 
 
-  complex(DP), allocatable::dpsim(:,:),dpsip(:,:)
+!  complex(DP), allocatable::dpsim(:,:),dpsip(:,:)
   complex(DP), allocatable, target :: dvscfin(:,:)
   ! change of the scf potential
   complex(DP), pointer :: dvscfins (:,:)
@@ -158,8 +158,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
      dvscfins => dvscfin
   endif
  
-  allocate (dpsip(npwx*npol, nbnd))
-  allocate (dpsim(npwx*npol, nbnd))
+!  allocate (dpsip(npwx*npol, nbnd))
+!  allocate (dpsim(npwx*npol, nbnd))
 
   
   allocate (drhoscfh ( dfftp%nnr, nspin_mag))
@@ -364,9 +364,9 @@ SUBROUTINE solve_linter (drhoscf, iw)
            etc(:,:) = CMPLX( et(:,:), 0.0d0 , kind=DP)
            cw = fiu(iw)
 
-!           if(real(fiu(iw)).eq.0.d0.and.aimag(fiu(iw)).eq.0.d0)then
+           if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
 !           write(*,*)'static response'
-           if(iw.eq.1) then
+!           if(iw.eq.1) then
            call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsip, &
                              h_diag, npwx, npwq, thresh, ik, lter, conv_root, &
                              anorm, nbnd_occ(ikk), npol )
@@ -488,8 +488,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !
      !   And we mix with the old potential
      !
-      if(iw.eq.1)then
-!      if(real(fiu(iw)).eq.0.d0.and.aimag(fiu(iw)).eq.0.d0)then
+!      if(iw.eq.1)then
+      if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
       call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
                          alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                          nmix_ph, flmixdpot, convt)
@@ -510,7 +510,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
          enddo
      endif
 
-    
+
 
 #ifdef __MPI
      aux_avg (1) = DBLE (ltaver)
@@ -538,6 +538,15 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
      if (check_stop_now()) call stop_smoothly_ph (.false.)
 !Well spotted Kun!
+   if (convt) then
+     if (doublegrid) then
+        do is = 1, nspin_mag
+              call cinterpolate (drhoscfh(1,is), drhoscf(1,is), -1)
+        enddo
+     else
+        call zcopy (nspin_mag*dfftp%nnr, drhoscfh, 1, drhoscf, 1)
+     endif
+   end if
 !  KC   if (convt) call zcopy (dfftp%nnr*nspin_mag, drhoscfh(1,1), 1, drhoscf(1,1), 1)
      if (convt) goto 155
   enddo
@@ -570,8 +579,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
   deallocate (drhoscfh)
   if (doublegrid) deallocate (dvscfins)
   deallocate (dvscfin)
-  deallocate (dpsip)
-  deallocate (dpsim)
+!  deallocate (dpsip)
+!  deallocate (dpsim)
 
   call stop_clock ('solve_linter')
 END SUBROUTINE solve_linter

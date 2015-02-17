@@ -88,7 +88,7 @@ PROGRAM magnon
   WRITE(stdout, '(/5x, "Finished reading variables")') 
   WRITE(stdout, '(7x, "Imag. Frequencies: ")')
   DO i = 1, nfs
-       WRITE(stdout,'(8x, i4, 4x, 2f9.4)')i, fiu(i)*13.605
+     WRITE(stdout,'(8x, i4, 4x, 2f9.4)')i, fiu(i)*13.605
   ENDDO
 
   !
@@ -111,7 +111,7 @@ PROGRAM magnon
   
   DO iq = 1, num_k_pts
      !
-     print*, "Number of qpoints to calc.", num_k_pts
+     write(stdout,*) "Number of qpoints to calc.", num_k_pts
 
      CALL prepare_q(do_band, do_iq, setup_pw, iq)
     ! WRITE(stdout,)
