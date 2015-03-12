@@ -20,6 +20,7 @@ SUBROUTINE magscf
   USE lsda_mod, ONLY : nspin
   USE io_global,  ONLY : stdout, ionode
 !  USE fft_base,   ONLY : dfftp
+  USE cell_base, ONLY : omega
   USE uspp,  ONLY: okvan
   USE efield_mod, ONLY : zstarue0, zstarue0_rec
   USE control_ph, ONLY : zue, convt, rec_code, do_elec,lgamma!, do_trans,
@@ -34,6 +35,7 @@ SUBROUTINE magscf
   USE qpoint,          ONLY : xq, dbext
   USE fft_base,   ONLY: dfftp, dffts
   USE fft_interfaces, ONLY: fwfft, invfft
+  USE spin_orb, ONLY : domag
 
   USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
   USE mp,         ONLY : mp_sum
@@ -42,12 +44,12 @@ SUBROUTINE magscf
 
   IMPLICIT NONE
 
-  INTEGER :: irr, irr1, imode0, npe, ig,iw
+  INTEGER :: irr, irr1, imode0, npe, ig,iw, ir, i
   ! counter on the representations
   ! counter on the representations
   ! counter on the modes
   ! npert(irr)
-
+  COMPLEX(DP) :: magtot_nc(1:3)
   REAL(DP) :: tcpu, get_clock
   ! timing variables
 
@@ -65,7 +67,7 @@ SUBROUTINE magscf
 
         WRITE( stdout, '(/,5x,"qpoint= ", 3f12.5)'), xq(1:3)
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
-        WRITE( stdout, *)'npol,nspin_mag', npol, nspin_mag
+        WRITE( stdout, *)'npol,nspin_mag, domag', npol, nspin_mag, domag
         WRITE( stdout, *)'dfftp,dffts, doublegrid,nls(1)', dfftp%nnr, dffts%nnr, doublegrid,nls(1)
 
 !        do iw =1, nfs
@@ -79,6 +81,45 @@ do iw =1, nfs
                 WRITE( stdout, '(/,5x,"X_[G](Gp)")')
                 WRITE( stdout, '("charge density response ")')
                 WRITE( stdout, *)
+
+!  KC: output the magnetization in real space for test purpose only 
+       if(noncolin)then
+          magtot_nc = (0.D0, 0.d0)
+!          absmag    = 0.D0
+          !
+          DO ir = 1,dfftp%nnr
+             !
+             !mag = SQRT( drhoscfs(ir,2)**2 + &
+             !            drhoscfs(ir,3)**2 + &
+             !            drhoscfs(ir,4)**2 )
+             !
+             DO i = 1, 3
+                !
+                magtot_nc(i) = magtot_nc(i) + drhoscfs(ir,i+1)
+                !
+             END DO
+             !
+             !absmag = absmag + ABS( mag )
+             !
+          END DO
+          !
+          !CALL mp_sum( magtot_nc, intra_bgrp_comm )
+          !CALL mp_sum( absmag, intra_bgrp_comm )
+          !
+          DO i = 1, 3
+             !
+             magtot_nc(i) = magtot_nc(i) * omega / (dfftp%nr1*dfftp%nr2*dfftp%nr3 )
+             !
+          END DO
+          !
+!          absmag = absmag * omega / ( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
+          write(stdout, '("change of the total magnetiztion in Bohr mag/cell")')
+          write(stdout, '("mx",2f8.3)') magtot_nc(1)
+          write(stdout, '("my",2f8.3)') magtot_nc(2)
+          write(stdout, '("mz",2f8.3)') magtot_nc(3)
+     end if
+!  KC: end of the test
+
 !                write(stdout,'(7f14.7)') (real(drhoscfs (ig,1)), ig = 1,7)
                 do ig=1, nspin_mag
                    CALL fwfft ('Smooth', drhoscfs(:,ig), dffts)

@@ -86,7 +86,7 @@ PROGRAM magnon
   !WRITE(stdout,*)xk_kpoints(1,iq), xk_kpoints(2,iq), xk_kpoints(3,iq)
   !end do 
   WRITE(stdout, '(/5x, "Finished reading variables")') 
-  WRITE(stdout, '(7x, "Imag. Frequencies: ")')
+  WRITE(stdout, '(7x, "Imag. Frequencies: (eV)")')
   DO i = 1, nfs
      WRITE(stdout,'(8x, i4, 4x, 2f9.4)')i, fiu(i)*13.605
   ENDDO
