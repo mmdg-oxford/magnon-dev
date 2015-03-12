@@ -215,6 +215,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   !   The outside loop is over the iterations
   !
   do kter = 1, niter_ph
+!   do kter = 1, 1
      iter = kter + iter0
 
      ltaver = 0
@@ -500,7 +501,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
       end if
 
         if (lmetq0.and.convt) &
-            call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
+         call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
      ! check that convergent have been reached on ALL processors in this image
      CALL check_all_convt(convt)
 
