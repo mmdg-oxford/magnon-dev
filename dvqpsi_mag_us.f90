@@ -133,11 +133,11 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
       do ip=1,npol
         if(ip==1)then 
            do ir = 1, dffts%nnr
-              aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+             aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
            end do
         else
            do ir = 1, dffts%nnr
-              aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
+             aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
            end do
         end if
       end do 
@@ -156,8 +156,8 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
 !Y: \mu_b \sigma_{y}B_{y}
     if(dbext(2).ne.0.d0) then
         do ir = 1, dffts%nnr
-           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*dbext(2)*psic(ir,2)
-           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*dbext(2)*psic(ir,1)
+           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*dbext(2)*(0.d0,1.d0)*psic(ir,2)
+           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*dbext(2)*(0.d0,1.d0)*psic(ir,1)
         enddo
     endif
 
