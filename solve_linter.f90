@@ -203,6 +203,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
         allocate ( ldos ( dfftp%nnr  , nspin_mag) )
         allocate ( ldoss( dffts%nnr , nspin_mag) )
         call localdos ( ldos , ldoss , dos_ef )
+  write(stdout, *)'dos_ef', dos_ef
   endif
   !
   !
@@ -354,7 +355,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !
               ! starting threshold for iterative solution of the linear system
               !
-              thresh = 1.0d-2
+              thresh = 1.0d-4
            endif
 
            !
@@ -366,6 +367,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
            cw = fiu(iw)
 
            if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
+!           if(.false.)then
 !           write(*,*)'static response'
 !           if(iw.eq.1) then
            call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsip, &
@@ -410,7 +412,10 @@ SUBROUTINE solve_linter (drhoscf, iw)
            !
            weight = wk (ikk)
            IF (noncolin) THEN
-              call incdrhoscf_nc(drhoscf(1,1),weight,ik, &
+!              call incdrhoscf_nc(drhoscf(1,1),weight,ik, &
+!                                 dbecsum_nc(1,1,1,1), dpsip,dpsim)
+
+               call incdrhoscf_nc(drhoscf(1,1),weight,ik, &
                                  dbecsum_nc(1,1,1,1), dpsi)
            ELSE
               call incdrhoscf (drhoscf(1,current_spin), weight, ik, &

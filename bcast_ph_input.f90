@@ -21,9 +21,9 @@ subroutine bcast_ph_input ( )
                          niter_ph, lnoloc, alpha_mix, tr2_ph, lrpa, recover, &
                          ldisp, reduce_io, zue, zeu, epsil, trans, &
                          lgamma, ldiag, lqdir, search_sym,  electron_phonon,&
-                         do_elec
+                         do_elec, dbext
   USE gamma_gamma, ONLY : asr
-  USE qpoint, ONLY: dbext
+!  USE qpoint, ONLY: dbext
   USE disp, ONLY : nq1, nq2, nq3, kpoints, xk_kpoints
   USE partial, ONLY : nat_todo
   USE freq_ph, ONLY : fpol

@@ -72,7 +72,7 @@ real(DP) :: &
 
   COMPLEX(DP)  :: cw
 
-!HL need to introduce gt tt ht htold for BICON
+! HL need to introduce gt tt ht htold for BICON
 ! also gp grp for preconditioned systems
 
   complex(DP), allocatable :: gt (:,:), tt (:,:), ht (:,:), htold (:,:)
@@ -145,12 +145,14 @@ real(DP) :: &
         END IF
         do ibnd = 1, nbnd
            call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1)
-           gt(:,ibnd) = dconjg ( g(:,ibnd) )
+           !gt(:,ibnd) = dconjg ( g(:,ibnd) )
+           gt(:,ibnd) =  g(:,ibnd) 
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
            call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)
            if(tprec) call cg_psi(ndmx, ndim, 1, h(1,ibnd), h_diag(1,ibnd) )
-           ht(:,ibnd) = dconjg( h(:,ibnd) )
+           !ht(:,ibnd) = dconjg( h(:,ibnd) )
+           ht(:,ibnd) =  h(:,ibnd) 
         enddo
      endif
 
@@ -159,10 +161,7 @@ real(DP) :: &
      do ibnd = 1, nbnd
         if (conv (ibnd).eq.0) then
             lbnd = lbnd+1
-!            rho(lbnd) = abs(ZDOTC (ndim, g(1,ibnd), 1, g(1,ibnd), 1))
-              rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
-!           trick where we truncate early.
-!           rho(lbnd) = abs(ZDOTC (ngmpol, g(1,ibnd), 1, g(1,ibnd), 1))
+            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
         endif
      enddo
 
@@ -182,22 +181,22 @@ real(DP) :: &
         conv_root = conv_root.and.(conv (ibnd).eq.1)
      enddo
 
-    if (conv_root) goto 100
+     if (conv_root) goto 100
 ! compute t = A*h
 ! we only apply hamiltonian to unconverged bands.
-    lbnd = 0 
-    do ibnd = 1, nbnd
+     lbnd = 0 
+     do ibnd = 1, nbnd
         if (conv(ibnd).eq.0) then 
             lbnd = lbnd + 1
             call zcopy(ndmx*npol, h(1,ibnd),  1, hold(1,  lbnd), 1)
             call zcopy(ndmx*npol, ht(1,ibnd), 1, htold(1, lbnd), 1)
             eu(lbnd) = e(ibnd)
         endif
-    enddo
+     enddo
 
 !****************** THIS IS THE MOST EXPENSIVE PART**********************!
-    call h_psi (ndim, hold, t, eu(1), cw, ik, lbnd)
-    call h_psi (ndim, htold, tt, eu(1), dconjg(cw), ik, lbnd)
+     call h_psi (ndim, hold, t, eu(1), cw, ik, lbnd)
+     call h_psi (ndim, htold, tt, eu(1), dconjg(cw), ik, lbnd)
 
     lbnd=0
     do ibnd = 1, nbnd
@@ -215,7 +214,6 @@ real(DP) :: &
      call mp_sum(  a(1:lbnd), intra_pool_comm )
      call mp_sum(  c(1:lbnd), intra_pool_comm )
 #endif
-
      lbnd=0
      do ibnd = 1, nbnd
         if (conv (ibnd) .eq.0) then
@@ -223,15 +221,10 @@ real(DP) :: &
            alpha = a(lbnd) / c(lbnd)
 ! x  = x  + alpha        * p
            call ZAXPY (ndmx*npol,  alpha,  h(1,ibnd), 1, dpsi(1,ibnd), 1)
-!HLTIL
-! xt  = xt  + conjg(alpha) * pt
-!           call ZAXPY (ndmx*npol,  dconjg(alpha), ht(1,ibnd), 1, dpsitil(1,ibnd), 1)
-
 ! r  = r  - alpha        * q
 ! rt = rt - conjg(alpha) * qt
            call ZAXPY (ndmx*npol, -alpha,        t  (1, lbnd), 1, g  (1,ibnd), 1)
            call ZAXPY (ndmx*npol, -dconjg(alpha), tt (1, lbnd), 1, gt (1,ibnd), 1)
-
 ! rp  = inv(M) * r
 ! rtp = inv(M) * rt
            call ZCOPY (ndmx*npol, g  (1, ibnd), 1, gp  (1, ibnd), 1)
@@ -243,7 +236,7 @@ real(DP) :: &
            beta = - a(lbnd) / c(lbnd)
 ! pold  = p
 ! ptold = pt
-!Extra Copy
+! Extra Copy
            call ZCOPY (ndmx*npol, h  (1, ibnd), 1, hold  (1, ibnd), 1)
            call ZCOPY (ndmx*npol, ht (1, ibnd), 1, htold (1, ibnd), 1)
 ! p  = rp  +       beta  * pold
