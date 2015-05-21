@@ -29,8 +29,8 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   USE wavefunctions_module,  ONLY: evc
   USE nlcc_ph,    ONLY : nlcc_any, drc
   USE eqv,        ONLY : dvpsi, dmuxc, vlocq
-  USE qpoint,     ONLY : npwq, igkq, xq, eigqts, ikks, dbext
-  USE control_ph, ONLY : do_elec
+  USE qpoint,     ONLY : npwq, igkq, xq, eigqts, ikks
+  USE control_ph, ONLY : do_elec,dbext
 
   implicit none
   !
@@ -146,28 +146,28 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
 
 !  if(noncolin)then
 !X: \mu_b \sigma_{x}B_{x}
-    if(dbext(1).ne.0.d0) then
+!    if(dbext(1).ne.0.d0) then
         do ir = 1, dffts%nnr
           aux2(ir,1) = aux2(ir,1) + aux1 (ir)*dbext(1)*psic(ir,2)
           aux2(ir,2) = aux2(ir,2) + aux1 (ir)*dbext(1)*psic(ir,1)
         enddo
-    endif
+!    endif
 
 !Y: \mu_b \sigma_{y}B_{y}
-    if(dbext(2).ne.0.d0) then
+!    if(dbext(2).ne.0.d0) then
         do ir = 1, dffts%nnr
-           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*dbext(2)*(0.d0,1.d0)*psic(ir,2)
-           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*dbext(2)*(0.d0,1.d0)*psic(ir,1)
+           aux2(ir,1) = aux2(ir,1) + (0.0d0, -1.0d0)*aux1(ir)*dbext(2)*psic(ir,2)
+           aux2(ir,2) = aux2(ir,2) + (0.0d0, 1.0d0)*aux1(ir)*dbext(2)*psic(ir,1)
         enddo
-    endif
+!    endif
 
 !Z: \mu_b \sigma_{z}B_{z}
-    if(dbext(3).ne.0.d0) then
+!    if(dbext(3).ne.0.d0) then
         do ir = 1, dffts%nnr
            aux2(ir,1) = aux2(ir,1) + aux1 (ir)*dbext(3)*psic(ir,1)
            aux2(ir,2) = aux2(ir,2) - aux1 (ir)*dbext(3)*psic(ir,2)
         enddo
-    endif
+!    endif
    
 
    endif

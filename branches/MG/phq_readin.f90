@@ -40,10 +40,10 @@ SUBROUTINE phq_readin()
                             nmix_ph, ldisp, recover, lrpa, lnoloc, start_irr, &
                             last_irr, start_q, last_q, current_iq, tmp_dir_ph, &
                             ext_recover, ext_restart, u_from_file, ldiag, &
-                            search_sym, lqdir, electron_phonon, do_elec!, do_trans
+                            search_sym, lqdir, electron_phonon, do_elec, dbext!, do_trans
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
-  USE qpoint,        ONLY : nksq, xq, dbext
+  USE qpoint,        ONLY : nksq, xq
   USE partial,       ONLY : atomo, nat_todo, nat_todo_input
   USE output,        ONLY : fildyn, fildvscf, fildrho
   USE disp,          ONLY : nq1, nq2, nq3, num_k_pts, xk_kpoints, kpoints,nqs
@@ -223,9 +223,9 @@ SUBROUTINE phq_readin()
   !dbext(1) = (1.0, 0.0)
   !dbext(2) = (1.0, 0.0)
   !dbext(3) = (0.0, 0.0)
-  dbext(1) = 0.d0
-  dbext(2) = 0.d0
-  dbext(3) = 0.d0
+  dbext(1) = (0.d0, 0.d0)
+  dbext(2) = (0.d0, 0.d0)
+  dbext(3) = (0.d0, 0.d0)
 !
   do_elec = .FALSE.
  ! okvan=.TRUE.
@@ -349,8 +349,8 @@ SUBROUTINE phq_readin()
   IF (zue.AND..NOT.trans) CALL errore ('phq_readin', 'trans must be &
        &.t. for Zue calc.', 1)
 
-  IF (trans.AND.(lrpa.OR.lnoloc)) CALL errore('phq_readin', &
-                    'only dielectric constant with lrpa or lnoloc',1)
+  !IF (trans.AND.(lrpa.OR.lnoloc)) CALL errore('phq_readin', &
+  !                  'only dielectric constant with lrpa or lnoloc',1)
   !
   ! reads the frequencies ( just if fpol = .true. )
   !

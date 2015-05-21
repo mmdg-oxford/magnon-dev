@@ -154,8 +154,7 @@ subroutine addusddens (drhoscf, dbecsum, iflag)
 ! HL iflag = 1 only occurs if this routine is called from drho.f90 
 ! i.e. for situations where the augmentation charge/ beta functions have changed. 
                              call zaxpy (ngm, zsum, sk, 1, aux(1,is), 1)
-                             IF (okpaw.and.iflag==1) &
-                                    becsumort(ijh,na,is,mode) = zsum
+                             IF (okpaw.and.iflag==1) becsumort(ijh,na,is,mode) = zsum
                        enddo
                  endif
               enddo
@@ -182,6 +181,23 @@ subroutine addusddens (drhoscf, dbecsum, iflag)
   deallocate (ylmk0)
   deallocate (sk)
   deallocate (aux)
+
+!  if (iflag == 0) then
+!     allocate (drhous( dfftp%nnr, nspin_mag))
+!     do ipert = 1, npe
+!        mu = mode0 + ipert
+
+!!! drho.f90 writes at the phq_init stage drhous to file and at every stage this
+!!! is added to drhoscf 
+
+!        call davcio (drhous, lrdrhous, iudrhous, mu, -1)
+!        call daxpy (2*dfftp%nnr*nspin_mag, 1.d0, drhous, 1, drhoscf(1,1,ipert), 1)
+!     end do
+!     deallocate (drhous)
+!  end if
+
+
+
 
   call stop_clock ('addusddens')
   return

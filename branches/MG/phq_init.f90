@@ -236,7 +236,8 @@ SUBROUTINE phq_init()
 !    STOP
 
 
-
+!!! HL may be a missing term for ultrasoft.
+!!! CALL drho
 
 #ifdef __MPI
      CALL mp_sum ( eprec, intra_pool_comm )

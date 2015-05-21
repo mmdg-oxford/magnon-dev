@@ -89,7 +89,7 @@ MODULE qpoint
   ! the index of k point in the list of k
   ! the index of k+q point in the list of k
   REAL (DP) :: xq(3)
-  REAL (DP) :: dbext(3)
+ ! REAL (DP) :: dbext(3)
   !COMPLEX (DP) :: dbext(3)
   ! the coordinates of the q point
   COMPLEX (DP), ALLOCATABLE :: eigqts(:) ! nat)
@@ -296,6 +296,7 @@ MODULE control_ph
              current_iq,    & ! current q point
              start_q, last_q  ! initial q in the list, last_q in the list
   REAL(DP) :: tr2_ph  ! threshold for phonon calculation
+  COMPLEX (DP) :: dbext(3)            
   REAL(DP) :: alpha_mix(maxter), & ! the mixing parameter
               time_now,          & ! CPU time up to now
               alpha_pv             ! the alpha value for shifting the bands
