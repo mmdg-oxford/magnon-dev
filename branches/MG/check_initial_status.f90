@@ -65,44 +65,44 @@ SUBROUTINE check_initial_status(auxdyn)
   !
   ! ... Checking the status of the calculation
   !
-  IF (recover) THEN
-!
-!  check if a recover file exists. In this case the first q point is
-!  the current one.
-!
-     IF (.NOT.ext_recover.AND..NOT.ext_restart) THEN
-        iq_start=start_q
-        done_bands=.FALSE.
-     ELSE
-        iq_start=current_iq
-     ENDIF
-!
-!  check which representation files are available on the disk and
-!  sets which q points and representations have been already calculated
-!
-     CALL check_status_run()
-!
-! write the information on output
-!
-     IF (last_q<1.OR.last_q>nqs) last_q=nqs
-     IF (iq_start<=last_q.AND.iq_start>0) THEN
-        WRITE(stdout, &
-            '(5x,i4," /",i4," q-points for this run, from", i3,&
-               & " to", i3,":")') last_q-iq_start+1, nqs, iq_start, last_q
-        WRITE(stdout, '(5x,"  N       xq(1)         xq(2)         xq(3) " )')
-        DO iq = 1, nqs
-           WRITE(stdout, '(5x,i3, 3f14.9,l6)') iq, x_q(1,iq), x_q(2,iq), &
-                             x_q(3,iq)
-        END DO
-        WRITE(stdout, *)
-     ELSEIF (iq_start>last_q) THEN
-        WRITE(stdout, &
-            '(5x,"Starting q",i4," larger than total number of q points", i4, &
-               & " or of last q ", i3)') iq_start, nqs, last_q
-     ELSEIF (iq_start<0) THEN
-        CALL errore('check_initial_status','wrong iq_start',1)
-     ENDIF
-  ENDIF
+!  IF (recover) THEN
+!!
+!!  check if a recover file exists. In this case the first q point is
+!!  the current one.
+!!
+!     IF (.NOT.ext_recover.AND..NOT.ext_restart) THEN
+!        iq_start=start_q
+!        done_bands=.FALSE.
+!     ELSE
+!        iq_start=current_iq
+!     ENDIF
+!!
+!!  check which representation files are available on the disk and
+!!  sets which q points and representations have been already calculated
+!!
+!     CALL check_status_run()
+!!
+!! write the information on output
+!!
+!     IF (last_q<1.OR.last_q>nqs) last_q=nqs
+!     IF (iq_start<=last_q.AND.iq_start>0) THEN
+!        WRITE(stdout, &
+!            '(5x,i4," /",i4," q-points for this run, from", i3,&
+!               & " to", i3,":")') last_q-iq_start+1, nqs, iq_start, last_q
+!        WRITE(stdout, '(5x,"  N       xq(1)         xq(2)         xq(3) " )')
+!        DO iq = 1, nqs
+!           WRITE(stdout, '(5x,i3, 3f14.9,l6)') iq, x_q(1,iq), x_q(2,iq), &
+!                             x_q(3,iq)
+!        END DO
+!        WRITE(stdout, *)
+!     ELSEIF (iq_start>last_q) THEN
+!        WRITE(stdout, &
+!            '(5x,"Starting q",i4," larger than total number of q points", i4, &
+!               & " or of last q ", i3)') iq_start, nqs, last_q
+!     ELSEIF (iq_start<0) THEN
+!        CALL errore('check_initial_status','wrong iq_start',1)
+!     ENDIF
+!  ENDIF
   !
   !  Create a new directory where the ph variables are saved and copy
   !  the charge density there.
@@ -156,14 +156,14 @@ SUBROUTINE check_initial_status(auxdyn)
   !  Set the q points to calculate. If there is the recover file, start from
   !  the q point of the recover file.
   !
-  IF (nimage==1) THEN
-     comp_iq=0
+!  IF (nimage==1) THEN
+!     comp_iq=0
      DO iq=iq_start,last_q
         comp_iq(iq)=1
      ENDDO
-  ELSE
-     CALL image_q_irr(iq_start)
-  ENDIF
+!  ELSE
+  !   CALL image_q_irr(iq_start)
+!  ENDIF
   !
   DO iq=1,nqs
      IF (comp_iq(iq).ne.1) CYCLE

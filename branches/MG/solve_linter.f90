@@ -49,7 +49,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover, do_elec
   USE nlcc_ph,              ONLY : nlcc_any
-  USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, &
+  USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, iudwf, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
                                    this_pcxpsi_is_on_file
   USE output,               ONLY : fildrho, fildvscf
@@ -63,7 +63,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE dfile_autoname,       ONLY : dfile_name
   USE save_ph,              ONLY : tmp_dir_save
   ! used oly to write the restart file
-  USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm, inter_image_comm, my_image_id
   USE mp,                   ONLY : mp_sum
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
   !
@@ -332,11 +332,11 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !
               ! starting value for delta_psi is read from iudwf
               !
-!              call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
+              call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
 
 !For frequency dependent case we will require two more wave functions
-              call davcio ( dpsip, lrdwf, iudwfp, nrec, -1)
-              call davcio ( dpsim, lrdwf, iudwfm, nrec, -1)
+ !             call davcio ( dpsip, lrdwf, iudwfp, nrec, -1)
+ !             call davcio ( dpsim, lrdwf, iudwfm, nrec, -1)
 
               !
               ! threshold for iterative solution of the linear system
@@ -348,8 +348,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !
  
               dpsi(:,:) = (0.d0, 0.d0)
-              dpsim(:,:)     = (0.d0, 0.d0)
-              dpsip(:,:)     = (0.d0, 0.d0)
+!              dpsim(:,:)     = (0.d0, 0.d0)
+!              dpsip(:,:)     = (0.d0, 0.d0)
               dvscfin (:, :) = (0.d0, 0.d0)
               dvscfout(:, :) = (0.d0, 0.d0)
               !
@@ -370,23 +370,23 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !           if(.false.)then
 !           write(*,*)'static response'
 !           if(iw.eq.1) then
-           call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsip, &
+           call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsi, &
                              h_diag, npwx, npwq, thresh, ik, lter, conv_root, &
                              anorm, nbnd_occ(ikk), npol )
-                dpsim(:,:) = dpsip(:,:)
-                dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
+!                dpsim(:,:) = dpsip(:,:)
+!                dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
 
            else
 !               write(stdout,*)'cbcg_solve_start'
               !cw = (0.01d0, 0.01)
               ! cw = (0.0d0, 0.d0)
-               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsip, h_diag, &
+               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
                      npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.)
 
-               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsim, h_diag, &
-                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, -cw, .true.)
+!               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsim, h_diag, &
+!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, -cw, .true.)
 
-               dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
+!               dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
 !               write(stdout,*)'cbcg_solve_end'
            endif
                    
@@ -405,8 +405,10 @@ SUBROUTINE solve_linter (drhoscf, iw)
            ! writes delta_psi on iunit iudwf, k=kpoint,
            !
            !               if (nksq.gt.1 .or. npert(irr).gt.1)
-           call davcio (dpsip, lrdwf, iudwfp, nrec, + 1)
-           call davcio (dpsim, lrdwf, iudwfm, nrec, + 1)
+!          call davcio (dpsip, lrdwf, iudwfp, nrec, + 1)
+!          call davcio (epsim, lrdwf, iudwfm, nrec, + 1)
+!       if(qpol ==1) then
+           call davcio (dpsi, lrdwf, iudwf, nrec, + 1)
            !
            ! calculates dvscf, sum over k => dvscf_q_ipert
            !
@@ -418,11 +420,26 @@ SUBROUTINE solve_linter (drhoscf, iw)
                call incdrhoscf_nc(drhoscf(1,1),weight,ik, &
                                  dbecsum_nc(1,1,1,1), dpsi)
            ELSE
-              call incdrhoscf (drhoscf(1,current_spin), weight, ik, &
+              call incdrhoscf(drhoscf(1,current_spin), weight, ik, &
                                dbecsum(1,1,current_spin), dpsi)
            END IF
      enddo! on k-points
+         
+          
+          
 #ifdef __MPI
+     
+!     If (noncolin)then
+     if(my_image_id/=0)then
+     drhoscf =  CONJG(drhoscf)
+     end if
+
+     call mp_sum(drhoscf, inter_image_comm)
+     
+     if(my_image_id/=0)then
+     drhoscf =  CONJG(drhoscf)
+     end if    
+!     end if
      !
      !  The calculation of dbecsum is distributed across processors (see addusdbec)
      !  Sum over processors the contributions coming from each slice of bands
@@ -555,7 +572,9 @@ SUBROUTINE solve_linter (drhoscf, iw)
    end if
 !  KC   if (convt) call zcopy (dfftp%nnr*nspin_mag, drhoscfh(1,1), 1, drhoscf(1,1), 1)
      if (convt) goto 155
-  enddo
+
+
+  enddo    ! end of iter
 155 iter0=0
   !
   !    A part of the dynamical matrix requires the integral of

@@ -65,8 +65,8 @@ subroutine allocate_phq
   !
   allocate (dvpsi ( npwx*npol , nbnd))
   allocate ( dpsi ( npwx*npol , nbnd))
-  allocate ( dpsip ( npwx*npol , nbnd))
-  allocate ( dpsim ( npwx*npol , nbnd))
+ ! allocate ( dpsip ( npwx*npol , nbnd))
+ ! allocate ( dpsim ( npwx*npol , nbnd))
   !
   allocate (vlocq ( ngm , ntyp))
   allocate (dmuxc ( dfftp%nnr , nspin_mag , nspin_mag))
