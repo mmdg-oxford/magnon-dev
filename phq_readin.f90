@@ -40,7 +40,7 @@ SUBROUTINE phq_readin()
                             nmix_ph, ldisp, recover, lrpa, lnoloc, start_irr, &
                             last_irr, start_q, last_q, current_iq, tmp_dir_ph, &
                             ext_recover, ext_restart, u_from_file, ldiag, &
-                            search_sym, lqdir, electron_phonon, do_elec, dbext!, do_trans
+                            search_sym, lqdir, electron_phonon, do_elec, dbext, qplot!, do_trans
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
   USE qpoint,        ONLY : nksq, xq
@@ -213,7 +213,7 @@ SUBROUTINE phq_readin()
   last_q       =-1000
   ldiag        =.FALSE.
   lqdir        =.FALSE.
-  search_sym   =.TRUE.
+  search_sym   =.false.
   nk1       = 0
   nk2       = 0
   nk3       = 0
@@ -228,6 +228,7 @@ SUBROUTINE phq_readin()
   dbext(3) = (0.d0, 0.d0)
 !
   do_elec = .FALSE.
+  qplot = .false.
  ! okvan=.TRUE.
   !
   drho_star%open = .FALSE.
@@ -387,7 +388,15 @@ SUBROUTINE phq_readin()
      fiu=0.0_DP
   END IF
 
+!Using image to separate (+-)q and (+-)fiu
 
+if(my_image_id/=0)then
+xk_kpoints=-xk_kpoints
+fiu=-fiu
+!end if
+
+!write(*,*)'my_image_id', my_image_id, xk_kpoints(1,1), fiu(1),fiu(2)
+end if
   !
   !
   !   Here we finished the reading of the input file.

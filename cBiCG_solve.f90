@@ -145,14 +145,14 @@ real(DP) :: &
         END IF
         do ibnd = 1, nbnd
            call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1)
-           !gt(:,ibnd) = dconjg ( g(:,ibnd) )
-           gt(:,ibnd) =  g(:,ibnd) 
+           gt(:,ibnd) = dconjg ( g(:,ibnd) )
+!           gt(:,ibnd) =  g(:,ibnd)   ! HL
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
            call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)
            if(tprec) call cg_psi(ndmx, ndim, 1, h(1,ibnd), h_diag(1,ibnd) )
-           !ht(:,ibnd) = dconjg( h(:,ibnd) )
-           ht(:,ibnd) =  h(:,ibnd) 
+           ht(:,ibnd) = dconjg( h(:,ibnd) )  
+!           ht(:,ibnd) =  h(:,ibnd)    !HL
         enddo
      endif
 

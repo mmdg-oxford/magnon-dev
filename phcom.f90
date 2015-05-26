@@ -336,7 +336,8 @@ MODULE control_ph
              xmldyn=.FALSE.,   & ! if true the dynamical matrix is in xml form
              all_done, &      ! if .TRUE. all representations have been done
              newgrid=.FALSE., & ! if .TRUE. use new k-point grid nk1,nk2,nk3
-             do_elec
+             do_elec,  &
+             qplot     ! read in a set of q points other than one single q point
 
   !
 END MODULE control_ph
@@ -376,6 +377,7 @@ MODULE units_ph
        lrebar,    & ! length of the DV_{bare} fro the electric field
        iudwfp,     & ! unit with D psip
        iudwfm,    &  ! unit with D psim
+       iudwf,     &  ! unit with D psi
        iupsir,    & ! unit with evc in real space
        lrdwf,     & ! length of D psi record
        iudrhous, lrdrhous, &

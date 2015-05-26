@@ -66,11 +66,8 @@ SUBROUTINE prepare_q(do_band, do_iq, setup_pw, iq, minq)
      ! ... set the q point
 !MINUS Q
 !      xq(1:3)  = x_q(1:3,iq)
-!       if(qpol ==1) then
+       
        xq(1:3)  = xk_kpoints(1:3,iq)
-!       else if if(qpol ==2) then
-!       xq(1:3)  = -xk_kpoints(1:3,iq)
-!       end if
 !      if ( xq(1) == 0.D0 .AND. xq(2) == 0.D0 .AND. xq(3) == 0.D0 ) xq(1) = 0.1
 !      xq(:) = xk_kpoints(:, 1)
 !Check if it is lgamma
