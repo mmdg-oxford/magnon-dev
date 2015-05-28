@@ -136,7 +136,7 @@ subroutine cgsolve_all (h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
      !    compute the gradient. can reuse information from previous step
      !
      if (iter == 1) then
-        call h_psi (ndim, dpsi, g, e, ik, nbnd)
+        call h_psi (ndim, dpsi, g, e, ik, nbnd)    ! (H-e+\alpha |p><p|) left hand side of the equation
         do ibnd = 1, nbnd
            call zaxpy (ndim, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd), 1)
         enddo
