@@ -127,14 +127,14 @@ real(DP) :: &
 
   do iter = 1, 200
     ! kter = kter + 1
-    ! g    = (-PcDv\Psi) - (H \Delta\Psi)
+    ! g    = (-PcDv\Psi) - (H \Delta\Psi)   ! AX
     ! gt   = conjg( g)
     ! r    = b - Ax 
     ! rt   = conjg ( r )
      if (iter .eq. 1) then
         !r = b - A* x
         !rt = conjg (r) 
-        call h_psi (ndim, dpsi, g, e, cw, ik, nbnd)
+        call h_psi (ndim, dpsi, g, e, cw, ik, nbnd)  !g=Ax   ! (H-e+\alpha |p><p|)dpsi left hand side of the linear equation
         do ibnd = 1, nbnd
            call zaxpy (ndim, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd), 1)
         enddo
@@ -143,13 +143,15 @@ real(DP) :: &
               call zaxpy (ndim, (-1.d0,0.d0), d0psi(ndmx+1,ibnd), 1, g(ndmx+1,ibnd), 1)
            enddo
         END IF
+           ! After this step, g=Ax-b
+
         do ibnd = 1, nbnd
-           call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1)
-           gt(:,ibnd) = dconjg ( g(:,ibnd) )
+           call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1) !g=r_0=b-Ax
+           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
 !           gt(:,ibnd) =  g(:,ibnd)   ! HL
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
-           call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)
+           call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)  !Copy g to h
            if(tprec) call cg_psi(ndmx, ndim, 1, h(1,ibnd), h_diag(1,ibnd) )
            ht(:,ibnd) = dconjg( h(:,ibnd) )  
 !           ht(:,ibnd) =  h(:,ibnd)    !HL
@@ -161,11 +163,18 @@ real(DP) :: &
      do ibnd = 1, nbnd
         if (conv (ibnd).eq.0) then
             lbnd = lbnd+1
-            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
+            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1)) 
+         !!!!! Here the convergence check is different from cg, why?
+         !!!!! This is not a relative convergence threshold 
         endif
      enddo
 
      kter_eff = kter_eff + DBLE (lbnd) / DBLE (nbnd)
+
+! sum within pools
+#ifdef __MPI
+call mp_sum(  rho(1:lbnd) , intra_pool_comm )
+#endif
 
      do ibnd = nbnd, 1, -1
         if (conv(ibnd).eq.0) then
@@ -182,7 +191,6 @@ real(DP) :: &
      enddo
 
      if (conv_root) goto 100
-! compute t = A*h
 ! we only apply hamiltonian to unconverged bands.
      lbnd = 0 
      do ibnd = 1, nbnd
@@ -195,25 +203,30 @@ real(DP) :: &
      enddo
 
 !****************** THIS IS THE MOST EXPENSIVE PART**********************!
-     call h_psi (ndim, hold, t, eu(1), cw, ik, lbnd)
-     call h_psi (ndim, htold, tt, eu(1), dconjg(cw), ik, lbnd)
+! compute t = A*h and tt=(A^H)*ht
+
+     call h_psi (ndim, hold, t, eu(1), cw, ik, lbnd)  ! t=A*h
+     call h_psi (ndim, htold, tt, eu(1), dconjg(cw), ik, lbnd)  ! tt=(A^H)*ht
 
     lbnd=0
     do ibnd = 1, nbnd
        if (conv (ibnd) .eq.0) then
            lbnd=lbnd+1
 !alpha = <rt|rp>/<pt|q>
-           call ZCOPY (ndmx*npol, g  (1, ibnd), 1, gp  (1, ibnd), 1)
+           call ZCOPY (ndmx*npol, g  (1, ibnd), 1, gp  (1, ibnd), 1)  !copy g to gp
            if (tprec) call cg_psi (ndmx, ndim, 1, gp(1,ibnd), h_diag(1,ibnd) )
-           a(lbnd) = ZDOTC (ndmx*npol, gt(1,ibnd), 1, gp(1,ibnd), 1)
-           c(lbnd) = ZDOTC (ndmx*npol, ht(1,ibnd), 1, t (1,lbnd), 1)
+           a(lbnd) = ZDOTC (ndmx*npol, gt(1,ibnd), 1, gp(1,ibnd), 1)  ! a=<r^|r>
+           c(lbnd) = ZDOTC (ndmx*npol, ht(1,ibnd), 1, t (1,lbnd), 1)  ! c=<h|Ah>
        endif
     enddo
+
+!when you have ZDOTC which corresponds to a sum within each band, you need intra_pool_comm operation
 
 #ifdef __MPI          
      call mp_sum(  a(1:lbnd), intra_pool_comm )
      call mp_sum(  c(1:lbnd), intra_pool_comm )
 #endif
+
      lbnd=0
      do ibnd = 1, nbnd
         if (conv (ibnd) .eq.0) then
@@ -233,6 +246,18 @@ real(DP) :: &
            if (tprec) call cg_psi (ndmx, ndim, 1, gtp (1,ibnd), h_diag(1,ibnd) )
 ! beta = - <qt|rp>/<pt|q>
            a(lbnd) = ZDOTC (ndmx*npol, tt(1,lbnd), 1, gp(1,ibnd), 1)
+
+        end if
+     end do
+
+#ifdef __MPI          
+     call mp_sum(  a(1:lbnd), intra_pool_comm )
+#endif 
+  
+     lbnd = 0
+     do ibnd =1, nbnd
+        if (conv (ibnd) .eq.0) then
+           lbnd=lbnd+1         
            beta = - a(lbnd) / c(lbnd)
 ! pold  = p
 ! ptold = pt
