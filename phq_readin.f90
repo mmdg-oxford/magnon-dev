@@ -393,8 +393,9 @@ SUBROUTINE phq_readin()
 if(my_image_id/=0)then
 xk_kpoints=-xk_kpoints
 fiu=-CONJG(fiu)
+dbext=CONJG(dbext)
 !end if
-
+!fiu=-fiu
 !write(*,*)'my_image_id', my_image_id, xk_kpoints(1,1), fiu(1),fiu(2)
 end if
   !
