@@ -102,7 +102,7 @@ subroutine incdrhoscf_nc (drhoscf, weight, ik, dbecsum, dpsi)
   enddo
 
 
- ! call addusdbec_nc (ik, weight, dpsi, dbecsum)
+!  call addusdbec_nc (ik, weight, dpsi, dbecsum)
   deallocate (psi)
   deallocate (dpsic)
 
