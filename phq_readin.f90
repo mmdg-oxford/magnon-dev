@@ -256,11 +256,11 @@ SUBROUTINE phq_readin()
   !
   IF (ionode) tmp_dir = trimcheck (outdir)
 
-  drho_star%dir=trimcheck(drho_star%dir)
-  dvscf_star%dir=trimcheck(dvscf_star%dir)
+!  drho_star%dir=trimcheck(drho_star%dir)
+!  dvscf_star%dir=trimcheck(dvscf_star%dir)
   ! filename for the star must always be automatically generated:
-  IF(drho_star%ext(1:5)/='auto:')  drho_star%ext  = 'auto:'//drho_star%ext
-  IF(dvscf_star%ext(1:5)/='auto:') dvscf_star%ext = 'auto:'//dvscf_star%ext
+!  IF(drho_star%ext(1:5)/='auto:')  drho_star%ext  = 'auto:'//drho_star%ext
+!  IF(dvscf_star%ext(1:5)/='auto:') dvscf_star%ext = 'auto:'//dvscf_star%ext
 
   CALL bcast_ph_input ( )
   CALL mp_bcast(nogg, ionode_id )
@@ -279,20 +279,20 @@ SUBROUTINE phq_readin()
        &nmix_ph ', 1)
   IF (iverbosity.NE.0.AND.iverbosity.NE.1) CALL errore ('phq_readin', &
        &' Wrong  iverbosity ', 1)
-  IF (fildyn.EQ.' ') CALL errore ('phq_readin', ' Wrong fildyn ', 1)
+!  IF (fildyn.EQ.' ') CALL errore ('phq_readin', ' Wrong fildyn ', 1)
   IF (max_seconds.LT.0.1D0) CALL errore ('phq_readin', ' Wrong max_seconds', 1)
 
-  IF (modenum < 0) CALL errore ('phq_readin', ' Wrong modenum ', 1)
-  IF (modenum /= 0) search_sym=.FALSE.
+!  IF (modenum < 0) CALL errore ('phq_readin', ' Wrong modenum ', 1)
+!  IF (modenum /= 0) search_sym=.FALSE.
   
-  trans = trans .OR. ldisp
+!  trans = trans .OR. ldisp
    
   !
   !  We can calculate  dielectric, raman or elop tensors and no Born effective
   !  charges dF/dE, but we cannot calculate Born effective charges dF/dE
   !  without epsil.
   !
-  IF (zeu) zeu = epsil
+  ! IF (zeu) zeu = epsil
   !
   !    reads the q point (just if ldisp = .false.)
   !
@@ -347,8 +347,8 @@ SUBROUTINE phq_readin()
 !          'gamma is needed for elec.field', 1)
 !  ENDIF
 
-  IF (zue.AND..NOT.trans) CALL errore ('phq_readin', 'trans must be &
-       &.t. for Zue calc.', 1)
+!  IF (zue.AND..NOT.trans) CALL errore ('phq_readin', 'trans must be &
+!       &.t. for Zue calc.', 1)
 
   !IF (trans.AND.(lrpa.OR.lnoloc)) CALL errore('phq_readin', &
   !                  'only dielectric constant with lrpa or lnoloc',1)
@@ -406,7 +406,7 @@ end if
   !   amass will also be read from file:
   !   save its content in auxiliary variables
   !
-  amass_input(:)= amass(:)
+  ! amass_input(:)= amass(:)
   !
   tmp_dir_save=tmp_dir
   tmp_dir_ph= TRIM (tmp_dir) // '_ph' // TRIM(int_to_char(my_image_id)) //'/'
@@ -414,23 +414,7 @@ end if
 
   ext_restart=.FALSE.
   ext_recover=.FALSE.
-  IF (recover) THEN
-     CALL ph_readfile('init',ierr)
-     IF (ierr /= 0 ) THEN
-        recover=.FALSE.
-        goto 1001
-     ENDIF
-     tmp_dir=tmp_dir_ph
-     CALL check_restart_recover(ext_recover, ext_restart)
-     tmp_dir=tmp_dir_save
-     IF (ldisp) lgamma = (current_iq==1)
-!
-!  If there is a restart or a recover file ph.x has saved its own data-file
-!  and we read the initial information from that file
-!
-     IF ((ext_recover.OR.ext_restart).AND..NOT.lgamma) tmp_dir=tmp_dir_ph
-     u_from_file=.true.
-  ENDIF
+
 1001 CONTINUE
 
 
@@ -447,13 +431,9 @@ end if
   !
   tmp_dir=tmp_dir_save
   !
-  IF (modenum > 3*nat) CALL errore ('phq_readin', ' Wrong modenum ', 2)
 
   IF (gamma_only) CALL errore('phq_readin',&
      'cannot start from pw.x data file using Gamma-point tricks',1)
-
-  IF (lda_plus_u) CALL errore('phq_readin',&
-     'The phonon code with LDA+U is not yet available',1)
 
   IF (okpaw.and.noncolin.and.domag) CALL errore('phq_readin',&
      'The phonon code with paw and domag is not available yet',1)
@@ -475,10 +455,6 @@ end if
   IF (nbgrp > 1) &
      CALL errore('phq_readin','band parallelization not available in phonon',1)
 
-  IF(dvscf_star%open.and.nimage>1) CALL errore('phq_readin',&
-       'dvscf_star with image parallelization is not yet available',1)
-  IF(drho_star%open.and.nimage>1) CALL errore('phq_readin',&
-       'drho_star with image parallelization is not yet available',1)
 
   IF (.NOT.ldisp) lqdir=.FALSE.
 
@@ -500,8 +476,7 @@ end if
   !  the dynamical matrix is written in xml format if fildyn ends in
   !  .xml or in the noncollinear case.
   !
-  xmldyn=has_xml(fildyn)
-  IF (noncolin) xmldyn=.TRUE.
+  
   !
   ! If a band structure calculation needs to be done do not open a file
   ! for k point
@@ -512,23 +487,8 @@ end if
   !  set masses to values read from input, if available;
   !  leave values read from file otherwise
   !
-  DO it = 1, ntyp
-     IF (amass_input(it) < 0.0_DP) amass_input(it)= &
-              atom_weight(atomic_number(TRIM(atm(it))))
-     IF (amass_input(it) > 0.D0) amass(it) = amass_input(it)
-     IF (amass(it) <= 0.D0) CALL errore ('phq_readin', 'Wrong masses', it)
-  ENDDO
   lgamma_gamma=.FALSE.
   IF (.NOT.ldisp) THEN
-     IF (nkstot==1.OR.(nkstot==2.AND.nspin==2)) THEN
-        lgamma_gamma=(lgamma.AND.(ABS(xk(1,1))<1.D-12) &
-                            .AND.(ABS(xk(2,1))<1.D-12) &
-                            .AND.(ABS(xk(3,1))<1.D-12) )
-     ENDIF
-     IF (nogg) lgamma_gamma=.FALSE.
-     IF ((nat_todo /= 0) .and. lgamma_gamma) CALL errore( &
-        'phq_readin', 'gamma_gamma tricks with nat_todo &
-       & not available. Use nogg=.true.', 1)
      !
      IF (lgamma) THEN
         nksq = nks
@@ -536,10 +496,7 @@ end if
         nksq = nks / 2
      ENDIF
   ENDIF
-  IF (lgamma_gamma.AND.ldiag) CALL errore('phq_readin','incompatible flags',1)
   !
-  IF (tfixed_occ) &
-     CALL errore('phq_readin','phonon with arbitrary occupations not tested',1)
   !
   !
   CALL allocate_part ( nat )
