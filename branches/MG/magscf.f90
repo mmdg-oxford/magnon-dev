@@ -148,7 +148,7 @@ do iw =1, nfs
       IF (noncolin) THEN
         write(stdout,*)"density matrix response with G=G'=(0 0 0 )"
 !       G=G'= (0 0 0)
-        write(stdout,'("q,freq, drho, "5f10.5,"  ",8f12.6)') xq(:), fiu(iw)*13.6057, (real(drhoscfs (nls(1),ig)), ig = 1,4), &
+        write(stdout,'("q,freq, drho, "5f10.5,"  ",8f10.6)') xq(:), fiu(iw)*13.6057, (real(drhoscfs (nls(1),ig)), ig = 1,4), &
                                                                       (aimag(drhoscfs(nls(1),ig)), ig = 1,4) !KC
 !        write(stdout,'("im_drho", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (nls(1),ig)), ig = 1,4)  !KC
 !      endif
@@ -159,10 +159,10 @@ do iw =1, nfs
 !        write(stdout,'("w, chiq+-, "f12.5,"  ",2f14.7)') real(fiu(iw))*13600, real(drhoscfs(1,3)+drhoscfs(1,2)) &
 !            -aimag(drhoscfs(1,3)-drhoscfs(1,2)), aimag(drhoscfs(1,3)+drhoscfs(1,2))+real(drhoscfs(1,3)-drhoscfs(1,2))
         write(stdout,'("w, chiq+-, "f12.5,"  ",4f14.7)') real(fiu(iw))*13605.7, &
-          real(drhoscfs(1,2)+(0.d0,1.d0)*drhoscfs(1,3)), & !/(dbext(1)+(0.d0,1.d0)*dbext(2))), &
-          aimag(drhoscfs(1,2)+(0.d0,1.d0)*drhoscfs(1,3)),&!/(dbext(1)+(0.d0,1.d0)*dbext(2)))
-          real(drhoscfs(1,2)-(0.d0,1.d0)*drhoscfs(1,3)), &
-          aimag(drhoscfs(1,2)-(0.d0,1.d0)*drhoscfs(1,3))
+          real(drhoscfs(1,2)+(0.d0,1.d0)*drhoscfs(1,3) /(dbext(1)+(0.d0,1.d0)*dbext(2))), &
+          aimag(drhoscfs(1,2)+(0.d0,1.d0)*drhoscfs(1,3)/(dbext(1)+(0.d0,1.d0)*dbext(2))), &
+          real(drhoscfs(1,2)-(0.d0,1.d0)*drhoscfs(1,3)/(dbext(1)-(0.d0,1.d0)*dbext(2))), &
+          aimag(drhoscfs(1,2)-(0.d0,1.d0)*drhoscfs(1,3)/(dbext(1)-(0.d0,1.d0)*dbext(2)))
       END IF
 !      write(stdout,'("imchiq+-", 3f12.5,"  ",f14.7)') xq(:),drhoscfs(1,3)-drhoscfs(1,2)
 !      end if

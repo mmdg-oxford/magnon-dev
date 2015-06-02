@@ -474,7 +474,23 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !
      call mp_sum ( drhoscf, inter_pool_comm )
      call mp_sum ( drhoscfh, inter_pool_comm )
+
+     if(my_image_id/=0)then
+     drhoscf =  CONJG(drhoscf)
+     drhoscfh =  CONJG(drhoscfh)
+     end if
+
+     call mp_sum(drhoscf, inter_image_comm)
+     call mp_sum(drhoscfh, inter_image_comm)
+
+     if(my_image_id/=0)then
+     drhoscf =  CONJG(drhoscf)
+     drhoscfh =  CONJG(drhoscfh)
+     end if
+
 #endif
+
+
 
      !
      ! q=0 in metallic case deserve special care (e_Fermi can shift)

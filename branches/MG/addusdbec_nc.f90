@@ -67,7 +67,7 @@ subroutine addusdbec_nc (ik, wgt, psi, dbecsum_nc)
   !
   !     First compute the product of psi and vkb
   !
-  call calbec (npwq, vkb, psi, dbecq_nc)
+  call calbec (npwq, vkb, psi, dbecq_nc) ! calculate  <beta|dpsi>
   !
   !  And then we add the product to becsum
   !

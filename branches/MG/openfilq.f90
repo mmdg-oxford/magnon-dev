@@ -97,13 +97,13 @@ SUBROUTINE openfilq()
   IF (ext_recover.AND..NOT.exst) &
      CALL errore ('openfilq','file '//trim(prefix)//'.dwf not found', 1)
 
-  CALL diropn (iudwfp, 'dwfp', lrdwf, exst)
-  IF (ext_recover.AND..NOT.exst) &
-     CALL errore ('openfilq','file '//trim(prefix)//'.dwfp not found', 1)
+!  CALL diropn (iudwfp, 'dwfp', lrdwf, exst)
+!  IF (ext_recover.AND..NOT.exst) &
+!     CALL errore ('openfilq','file '//trim(prefix)//'.dwfp not found', 1)
 
-  CALL diropn (iudwfm, 'dwfm', lrdwf, exst)
-  IF (ext_recover.AND..NOT.exst) &
-     CALL errore ('openfilq','file '//trim(prefix)//'.dwfm not found', 1)
+!  CALL diropn (iudwfm, 'dwfm', lrdwf, exst)
+!  IF (ext_recover.AND..NOT.exst) &
+!     CALL errore ('openfilq','file '//trim(prefix)//'.dwfm not found', 1)
   !
   !   open a file with the static change of the charge
   !
