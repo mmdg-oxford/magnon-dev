@@ -171,7 +171,9 @@ subroutine addusddens (drhoscf, dbecsum, iflag)
         enddo
         CALL invfft ('Dense', psic, dfftp)
         !KC: here the dimension seems to be wrong
-        call daxpy (2*dfftp%nnr, 1.0_DP, psic, 1, drhoscf(1,is), 1)
+        !call daxpy (2*dfftp%nnr, 1.0_DP, psic, 1, drhoscf(1,is), 1)
+        !KC: In the case of +q and -q, the weight should be changed to half
+        call daxpy (2*dfftp%nnr, 0.5_DP, psic, 1, drhoscf(1,is), 1)
 
      enddo
 
