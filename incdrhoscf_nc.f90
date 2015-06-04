@@ -59,7 +59,7 @@ subroutine incdrhoscf_nc (drhoscf, weight, ik, dbecsum, dpsi)
   call start_clock ('incdrhoscf')
   allocate (dpsic(dffts%nnr, npol))
   allocate (psi  (dffts%nnr, npol))
- ! wgt = 2.d0 * weight / omega
+!  wgt = 2.d0 * weight / omega
    wgt = weight / omega
 
   ikk = ikks(ik)
