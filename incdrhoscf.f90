@@ -54,8 +54,8 @@ subroutine incdrhoscf (drhoscf, weight, ik, dbecsum, dpsi)
   call start_clock ('incdrhoscf')
   allocate (dpsic(  dffts%nnr))
   allocate (psi  (  dffts%nnr))
-!  wgt = 2.d0 * weight / omega
-   wgt = weight / omega
+  wgt = 2.d0 * weight / omega
+!   wgt = weight / omega
   ikk = ikks(ik)
   !
   ! dpsi contains the   perturbed wavefunctions of this k point

@@ -230,6 +230,7 @@ SUBROUTINE phq_readin()
   do_elec = .FALSE.
   qplot = .false.
  ! okvan=.TRUE.
+  kpoints = .TRUE.
   !
   drho_star%open = .FALSE.
   drho_star%basis = 'modes'

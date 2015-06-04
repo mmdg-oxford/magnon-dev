@@ -7,7 +7,7 @@
 !
 !
 !----------------------------------------------------------------------
-subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
+subroutine addusddens (drhoscf, dbecsum, npe, iflag)
   !----------------------------------------------------------------------
   !
   !  This routine adds to the change of the charge and of the
@@ -138,38 +138,10 @@ subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
                     !
                     do ipert = 1, npe
                        do is = 1, nspin_mag
-                          mode = mode0 + ipert
-                          if (iflag==1) then
-                             zsum = dbecsum (ijh, na, is, ipert)
-                          else
-                             zsum = 2.0_DP*dbecsum (ijh, na, is, ipert)
-                          endif
-                          u1 = u (mu + 1, mode)
-                          u2 = u (mu + 2, mode)
-                          u3 = u (mu + 3, mode)
-                          if (abs(u1) + abs(u2) + abs(u3) .gt.1d-12 .and. &
-                              iflag.eq.1) then
-                             bb = becsum (ijh, na, is)
-                             zsum = zsum + &
-                                  ( alphasum (ijh, 1, na, is) * u1 &
-                                  + alphasum (ijh, 2, na, is) * u2 &
-                                  + alphasum (ijh, 3, na, is) * u3)
-                             IF (okpaw) becsumort(ijh,na,is,mode) =  zsum
-                             u1 = u1 * fact
-                             u2 = u2 * fact
-                             u3 = u3 * fact
-                             alpha_0 = xq(1)*u1 + xq(2)*u2 + xq(3)*u3
-                             do ig = 1, ngm
-                                alpha = alpha_0 + &
-                                        g(1,ig)*u1 + g(2,ig)*u2 + g(3,ig)*u3
-                                aux(ig,is,ipert) = aux(ig,is,ipert) + &
-                                                   (zsum + alpha*bb) * sk(ig)
-                             enddo
-                          else
-                             call zaxpy (ngm, zsum, sk, 1, aux(1,is,ipert), 1)
-                             IF (okpaw.and.iflag==1) &
-                                    becsumort(ijh,na,is,mode) = zsum
-                          endif
+                         
+                             zsum = 2.0_DP*dbecsum (ijh, na, is, ipert)                         
+                         
+                          call zaxpy (ngm, zsum, sk, 1, aux(1,is,ipert), 1)                        
                        enddo
                     enddo
                  endif
@@ -182,7 +154,7 @@ subroutine addusddens (drhoscf, dbecsum, mode0, npe, iflag)
   !     convert aux to real space
   !
   do ipert = 1, npe
-     mu = mode0 + ipert
+!     mu = mode0 + ipert
      do is = 1, nspin_mag
         psic(:) = (0.d0, 0.d0)
         do ig = 1, ngm

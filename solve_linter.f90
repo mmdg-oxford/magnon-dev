@@ -355,7 +355,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !
               ! starting threshold for iterative solution of the linear system
               !
-              thresh = 1.0d-4
+              thresh = 1.0d-2
+              if(niter_ph==1)thresh = 1.d-1 * sqrt (tr2_ph)
            endif
 
            !
@@ -381,7 +382,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !cw = (0.01d0, 0.01)
               ! cw = (0.0d0, 0.d0)
                call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
-                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.)
+                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,1)
 
 !               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsim, h_diag, &
 !                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, -cw, .true.)
@@ -429,17 +430,6 @@ SUBROUTINE solve_linter (drhoscf, iw)
           
 #ifdef __MPI
      
-!     If (noncolin)then
-     if(my_image_id/=0)then
-     drhoscf =  CONJG(drhoscf)
-     end if
-
-     call mp_sum(drhoscf, inter_image_comm)
-     
-     if(my_image_id/=0)then
-     drhoscf =  CONJG(drhoscf)
-     end if    
-!     end if
      !
      !  The calculation of dbecsum is distributed across processors (see addusdbec)
      !  Sum over processors the contributions coming from each slice of bands
@@ -475,18 +465,20 @@ SUBROUTINE solve_linter (drhoscf, iw)
      call mp_sum ( drhoscf, inter_pool_comm )
      call mp_sum ( drhoscfh, inter_pool_comm )
 
-     if(my_image_id/=0)then
-     drhoscf =  CONJG(drhoscf)
-     drhoscfh =  CONJG(drhoscfh)
-     end if
+!     if(my_image_id/=0)then
+!     drhoscf =  CONJG(drhoscf)
+!     drhoscfh =  CONJG(drhoscfh)
+!     end if
 
-     call mp_sum(drhoscf, inter_image_comm)
-     call mp_sum(drhoscfh, inter_image_comm)
+!     call mp_sum(drhoscf, inter_image_comm)
+!     call mp_sum(drhoscfh, inter_image_comm)
 
-     if(my_image_id/=0)then
-     drhoscf =  CONJG(drhoscf)
-     drhoscfh =  CONJG(drhoscfh)
-     end if
+!     if(my_image_id/=0)then
+!     drhoscf =  CONJG(drhoscf)
+!     drhoscfh =  CONJG(drhoscfh)
+!     end if
+
+     
 
 #endif
 
