@@ -58,11 +58,11 @@ PROGRAM magnon
   USE environment,     ONLY: environment_start
   USE qpoint, ONLY:xq
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
-
+  USE mp,                   ONLY : mp_sum
   !
   IMPLICIT NONE
   !
-  INTEGER :: iq,iq1,i
+  INTEGER :: iq,iq1,i, itest1, itest2
   LOGICAL :: do_band, do_iq, setup_pw
   CHARACTER (LEN=9)   :: code = 'MAGNON'
   CHARACTER (LEN=256) :: auxdyn
@@ -93,6 +93,7 @@ PROGRAM magnon
   WRITE(stdout, '(7x, "external magnetic field: Bx, By, Bz")')
   WRITE(stdout, '(6F10.5)')dbext(1),dbext(2),dbext(3)
   
+
 
   !
   CALL check_stop_init()

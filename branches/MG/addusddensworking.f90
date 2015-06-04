@@ -145,7 +145,6 @@ subroutine addusddens (drhoscf, dbecsum, iflag)
                     !  And qgmq and becp and dbecq
                     !
                        do is = 1, nspin_mag
-                           mode = 1
                           if (iflag==1) then
                              zsum = dbecsum (ijh, na, is)
                           else
@@ -154,7 +153,7 @@ subroutine addusddens (drhoscf, dbecsum, iflag)
 ! HL iflag = 1 only occurs if this routine is called from drho.f90 
 ! i.e. for situations where the augmentation charge/ beta functions have changed. 
                              call zaxpy (ngm, zsum, sk, 1, aux(1,is), 1)
-                             IF (okpaw.and.iflag==1) becsumort(ijh,na,is,mode) = zsum
+!                             IF (okpaw.and.iflag==1) becsumort(ijh,na,is,mode) = zsum
                        enddo
                  endif
               enddo
@@ -165,14 +164,15 @@ subroutine addusddens (drhoscf, dbecsum, iflag)
   !
   !     convert aux to real space
   !
-     mu = 1
      do is = 1, nspin_mag
         psic(:) = (0.d0, 0.d0)
         do ig = 1, ngm
            psic (nl (ig) ) = aux (ig, is)
         enddo
         CALL invfft ('Dense', psic, dfftp)
+        !KC: here the dimension seems to be wrong
         call daxpy (2*dfftp%nnr, 1.0_DP, psic, 1, drhoscf(1,is), 1)
+
      enddo
 
   if (.not.lgamma) deallocate (qpg)

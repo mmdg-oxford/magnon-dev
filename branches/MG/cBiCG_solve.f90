@@ -1,5 +1,5 @@
 SUBROUTINE cbcg_solve(h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
-     ndmx, ndim, ethr, ik, kter, conv_root, anorm, nbnd, npol, cw, tprec)
+     ndmx, ndim, ethr, ik, kter, conv_root, anorm, nbnd, npol, cw, tprec, itol)
 !
 !-----------------------------------------------------------------------
 !
@@ -58,7 +58,7 @@ real(DP) :: &
   !integer, parameter :: maxter = 200
   !integer, parameter :: maxter = 600
   !the maximum number of iterations
-  integer :: iter, ibnd, lbnd
+  integer :: iter, ibnd, lbnd, itol
   ! counters on iteration, bands
   integer , allocatable :: conv (:)
   ! if 1 the root is converged
@@ -86,7 +86,7 @@ real(DP) :: &
   complex(DP) :: e(nbnd), eu(nbnd)
 
   ! the scalar product
-  real(DP), allocatable :: rho (:), a(:), c(:), astar(:), cstar(:)
+  real(DP), allocatable :: rho (:), a(:), c(:), astar(:), cstar(:), b(:)
   ! the residue
   ! auxiliary for h_diag
   real(DP) :: kter_eff
@@ -100,6 +100,7 @@ real(DP) :: &
   allocate (a(nbnd), c(nbnd))
   allocate (conv ( nbnd))
   allocate (rho(nbnd))
+  if(itol==1)allocate(b(nbnd))
  !WRITE(6,*) g,t,h,hold
  !Initialize
   eu(:) = dcmplx(0.0d0,0.0d0)
@@ -136,13 +137,13 @@ real(DP) :: &
         !rt = conjg (r) 
         call h_psi (ndim, dpsi, g, e, cw, ik, nbnd)  !g=Ax   ! (H-e+\alpha |p><p|)dpsi left hand side of the linear equation
         do ibnd = 1, nbnd
-           call zaxpy (ndim, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd), 1)
-        enddo
-        IF (npol==2) THEN
-           do ibnd = 1, nbnd
-              call zaxpy (ndim, (-1.d0,0.d0), d0psi(ndmx+1,ibnd), 1, g(ndmx+1,ibnd), 1)
-           enddo
-        END IF
+           call zaxpy (ndmx*npol, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd), 1)
+           IF(itol==1) b(ibnd) = abs(ZDOTC (ndmx*npol, d0psi(1,ibnd), 1, d0psi(1,ibnd), 1)) !calculate |b|^2      
+        end do 
+
+#ifdef __MPI
+call mp_sum(  b(1:nbnd) , intra_pool_comm )
+#endif       
            ! After this step, g=Ax-b
 
         do ibnd = 1, nbnd
@@ -163,7 +164,9 @@ real(DP) :: &
      do ibnd = 1, nbnd
         if (conv (ibnd).eq.0) then
             lbnd = lbnd+1
-            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1)) 
+            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
+            if(itol==1)rho(lbnd)=rho(lbnd)/b(ibnd)
+             
          !!!!! Here the convergence check is different from cg, why?
          !!!!! This is not a relative convergence threshold 
         endif
