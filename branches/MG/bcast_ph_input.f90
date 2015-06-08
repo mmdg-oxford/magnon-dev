@@ -21,7 +21,7 @@ subroutine bcast_ph_input ( )
                          niter_ph, lnoloc, alpha_mix, tr2_ph, lrpa, recover, &
                          ldisp, reduce_io, zue, zeu, epsil, trans, &
                          lgamma, ldiag, lqdir, search_sym,  electron_phonon,&
-                         do_elec, dbext
+                         do_elec, dbext, dvext
   USE gamma_gamma, ONLY : asr
 !  USE qpoint, ONLY: dbext
   USE disp, ONLY : nq1, nq2, nq3, kpoints, xk_kpoints
@@ -90,6 +90,7 @@ subroutine bcast_ph_input ( )
   call mp_bcast (max_seconds, ionode_id )
   !
   call mp_bcast (dbext, ionode_id )
+  call mp_bcast (dvext, ionode_id )
   !
   ! characters
   !

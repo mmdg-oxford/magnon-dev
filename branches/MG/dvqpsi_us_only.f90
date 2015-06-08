@@ -99,7 +99,7 @@ subroutine dvqpsi_us_only (ik, uact)
   end if
   do ibnd = 1, nbnd
      IF (noncolin) THEN
-        CALL compute_deff_nc(deff_nc,et(ibnd,ikk))
+        CALL compute_deff_nc(deff_nc,et(ibnd,ikk))  ! calculate D-e*q
      ELSE
         CALL compute_deff(deff,et(ibnd,ikk))
      ENDIF
@@ -107,7 +107,7 @@ subroutine dvqpsi_us_only (ik, uact)
      do nt = 1, ntyp
         do na = 1, nat
            if (ityp (na) .eq.nt) then
-              mu = 3 * (na - 1)
+              mu = 3 * (na - 1)  ! mode number
               do ih = 1, nh (nt)
                  ikb = ijkb0 + ih
                  do jh = 1, nh (nt)

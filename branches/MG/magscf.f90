@@ -23,7 +23,7 @@ SUBROUTINE magscf
   USE cell_base, ONLY : omega
   USE uspp,  ONLY: okvan
   USE efield_mod, ONLY : zstarue0, zstarue0_rec
-  USE control_ph, ONLY : zue, convt, rec_code, do_elec,lgamma, dbext, lrpa!, do_trans,
+  USE control_ph, ONLY : zue, convt, rec_code, do_elec,lgamma, dbext, lrpa, dvext!, do_trans,
   USE partial,    ONLY : done_irr, comp_irr
   USE modes,      ONLY : nirr, npert, npertx
   USE phus,       ONLY : int3, int3_nc, int3_paw
@@ -69,6 +69,12 @@ SUBROUTINE magscf
         WRITE( stdout, '(/,5x,"Self-consistent Calculation")')
         WRITE( stdout, *)'npol,nspin_mag, domag', npol, nspin_mag, domag
         WRITE( stdout, *)'dfftp,dffts, doublegrid,nls(1)', dfftp%nnr, dffts%nnr, doublegrid,nls(1)
+
+        IF (okvan) THEN
+           ALLOCATE (int3 ( nhm, nhm, 1, nat, nspin_mag))
+           IF (okpaw) ALLOCATE (int3_paw (nhm, nhm, 1, nat, nspin_mag))
+           IF (noncolin) ALLOCATE(int3_nc( nhm, nhm, 1, nat, nspin))
+        ENDIF
 
 !        do iw =1, nfs
 do iw =1, nfs
@@ -173,6 +179,11 @@ end do
         tcpu = get_clock ('MAGNON')
         !
         DEALLOCATE (drhoscfs)
+        IF (okvan) THEN
+           DEALLOCATE (int3)
+           IF (okpaw) DEALLOCATE (int3_paw)
+           IF (noncolin) DEALLOCATE(int3_nc)
+        ENDIF
   CALL stop_clock ('magscf')
   RETURN
 END SUBROUTINE magscf

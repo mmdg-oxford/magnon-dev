@@ -296,7 +296,7 @@ MODULE control_ph
              current_iq,    & ! current q point
              start_q, last_q  ! initial q in the list, last_q in the list
   REAL(DP) :: tr2_ph  ! threshold for phonon calculation
-  COMPLEX (DP) :: dbext(3)            
+  COMPLEX (DP) :: dbext(3), dvext            
   REAL(DP) :: alpha_mix(maxter), & ! the mixing parameter
               time_now,          & ! CPU time up to now
               alpha_pv             ! the alpha value for shifting the bands
