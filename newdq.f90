@@ -40,7 +40,7 @@ subroutine newdq (dvscf, npe)
   integer :: npe
   ! input: the number of perturbations
 
-  complex(DP) :: dvscf (dfftp%nnr, nspin_mag, npe)
+  complex(DP) :: dvscf (dfftp%nnr, nspin_mag)
   ! input: the change of the self
   ! consistent pot.
   !
@@ -96,7 +96,7 @@ subroutine newdq (dvscf, npe)
 
      do is = 1, nspin_mag
         do ir = 1, dfftp%nnr
-           veff (ir) = dvscf (ir, is, ipert)
+           veff (ir) = dvscf (ir, is)
         enddo
         CALL fwfft ('Dense', veff, dfftp)
         do ig = 1, ngm
@@ -146,6 +146,8 @@ subroutine newdq (dvscf, npe)
 #ifdef __MPI
   call mp_sum ( int3, intra_pool_comm )
 #endif
+  IF (noncolin) CALL set_int3_nc(1)
+  IF (okpaw) int3=int3+int3_paw
 
   if (.not.lgamma) deallocate (qg)
   deallocate (qmod)

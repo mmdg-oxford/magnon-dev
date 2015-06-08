@@ -60,7 +60,7 @@ subroutine cgsolve_all (h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
   USE mp,             ONLY : mp_sum
   USE control_flags,  ONLY : gamma_only
   USE gvect,          ONLY : gstart
-
+  USE io_global,            ONLY : stdout, ionode
   implicit none
   !
   !   first the I/O variables
@@ -88,7 +88,7 @@ subroutine cgsolve_all (h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
   !
   !  here the local variables
   !
-  integer, parameter :: maxter = 200
+  integer, parameter :: maxiter = 200
   ! the maximum number of iterations
   integer :: iter, ibnd, lbnd
   ! counters on iteration, bands
@@ -131,7 +131,7 @@ subroutine cgsolve_all (h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
   t=(0.d0,0.d0)
   h=(0.d0,0.d0)
   hold=(0.d0,0.d0)
-  do iter = 1, maxter
+  do iter = 1, maxiter
      !
      !    compute the gradient. can reuse information from previous step
      !
@@ -187,6 +187,16 @@ subroutine cgsolve_all (h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
         conv_root = conv_root.and. (conv (ibnd) .eq.1)
      enddo
      if (conv_root) goto 100
+
+ if (iter.eq.maxiter .and. .not.conv_root) then
+   do ibnd=1, nbnd
+      if(conv(ibnd)/=1)then
+      WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+                &              " solve_linter: root not converged ",e10.3)') &
+                &              ik , ibnd, anorm
+      end if
+   end do
+ end if
      !
      !        compute the step direction h. Conjugate it to previous step
      !

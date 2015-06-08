@@ -55,7 +55,7 @@ real(DP) :: &
 
 !HL upping iterations to get convergence with green_linsys?
 
-  !integer, parameter :: maxter = 200
+  integer, parameter :: maxiter = 200
   !integer, parameter :: maxter = 600
   !the maximum number of iterations
   integer :: iter, ibnd, lbnd, itol
@@ -126,7 +126,7 @@ real(DP) :: &
 
   call start_clock ('cbcgsolve')
 
-  do iter = 1, 200
+  do iter = 1, maxiter
     ! kter = kter + 1
     ! g    = (-PcDv\Psi) - (H \Delta\Psi)   ! AX
     ! gt   = conjg( g)
@@ -194,6 +194,16 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
      enddo
 
      if (conv_root) goto 100
+    
+ if (iter.eq.maxiter .and. .not.conv_root) then
+   do ibnd=1, nbnd
+      if(conv(ibnd)/=1)then
+      WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+                &              " solve_linter: root not converged ",e10.3)') &
+                &              ik , ibnd, anorm
+      end if
+   end do
+ end if 
 ! we only apply hamiltonian to unconverged bands.
      lbnd = 0 
      do ibnd = 1, nbnd

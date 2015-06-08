@@ -54,7 +54,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    this_pcxpsi_is_on_file
   USE output,               ONLY : fildrho, fildvscf
   USE phus,                 ONLY : int3_paw, becsumort
-  USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec, dpsip,dpsim
+  USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec  !, dpsip,dpsim
   USE qpoint,               ONLY : xq, npwq, igkq, nksq, ikks, ikqs
   USE modes,                ONLY : npertx, npert, u, t, irotmq, tmq, &
                                    minus_q, nsymq, rtau
@@ -312,14 +312,18 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !  selfconsist term which comes from the dependence of D on
               !  V_{eff} on the bare change of the potential
               !
-              !Need to check this for ultrasoft
+              !Need to check this for ultrasoft              
               !HL THIS TERM PROBABLY NEEDS TO BE INCLUDED.
-              !call adddvscf (ipert, ik)
+              !KC: This term needs to be included for USPP.
+              !KC: add the augmentation charge term for dvscf
+              call adddvscf (1, ik)
            else
              ! At the first iteration dvbare_q*psi_kpoint is calculated
              ! and written to file
              ! call dvqpsi_us (ik, u (1, mode),.false. )
                call dvqpsi_mag_us (ik, .false.)
+             ! add the augmentation charge term for dvext and dbext
+               call adddvscf (1, ik)
                call davcio (dvpsi, lrbar, iubar, nrec, 1)
            endif
            !
@@ -356,7 +360,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
               ! starting threshold for iterative solution of the linear system
               !
               thresh = 1.0d-2
-              if(niter_ph==1)thresh = 1.d-1 * sqrt (tr2_ph)
+              if(niter_ph==1)thresh = 1.d-5 ! * sqrt (tr2_ph)
            endif
 
            !
@@ -395,9 +399,9 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !           write(stdout,*)'cbcg_solve_end'
            ltaver = ltaver + lter
            lintercall = lintercall + 1
-           if (.not.conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
-                &              " solve_linter: root not converged ",e10.3)') &
-                &              ik , ibnd, anorm
+!           if (.not.conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
+!                &              " solve_linter: root not converged ",e10.3)') &
+!                &              ik , ibnd, anorm
 !          if (conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
 !                &              " solve_linter: root converged ",e10.3)') &
 !                &              ik , ibnd, anorm
@@ -518,6 +522,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
      call dv_of_drho (dvscfout(1,1), .false.)
      !
      !   And we mix with the old potential
+
+
      !
 !      if(iw.eq.1)then
       if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
@@ -541,7 +547,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
          enddo
      endif
 
-
+    call newdq (dvscfin, 1)  !KC: calculate int3 for dvscf
 
 #ifdef __MPI
      aux_avg (1) = DBLE (ltaver)

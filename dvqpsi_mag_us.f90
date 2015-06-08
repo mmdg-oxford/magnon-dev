@@ -30,7 +30,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   USE nlcc_ph,    ONLY : nlcc_any, drc
   USE eqv,        ONLY : dvpsi, dmuxc, vlocq
   USE qpoint,     ONLY : npwq, igkq, xq, eigqts, ikks
-  USE control_ph, ONLY : do_elec,dbext
+  USE control_ph, ONLY : do_elec,dbext, dvext
 
   implicit none
   !
@@ -133,11 +133,11 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
       do ip=1,npol
         if(ip==1)then 
            do ir = 1, dffts%nnr
-             aux2(ir,1) = aux2(ir,1) + aux1 (ir)*psic(ir,1)
+             aux2(ir,1) = aux2(ir,1) + aux1 (ir)*dvext*psic(ir,1)
            end do
         else
            do ir = 1, dffts%nnr
-             aux2(ir,2) = aux2(ir,2) + aux1 (ir)*psic(ir,2)
+             aux2(ir,2) = aux2(ir,2) + aux1 (ir)*dvext*psic(ir,2)
            end do
         end if
       end do 
@@ -201,9 +201,11 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
      deallocate (aux)
      if (doublegrid) deallocate (auxs)
   endif
-  !
-  !HL additional term from contribution nonlocal potential
-  !call dvqpsi_us_only (ik, uact)
+  !KC : a part is needed here for magnon using USPP
+
+!  call dvqpsi_us_only (ik, uact)
+  call newdq_ext   ! KC: calculate int3 for dvext and dbext
+
   call stop_clock ('dvqpsi_us')
   return
 end subroutine dvqpsi_mag_us

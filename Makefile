@@ -44,6 +44,10 @@ drhodvnl.o \
 dv_of_drho.o \
 dvkb3.o \
 dvpsi_e.o \
+transform_int_nc.o \
+transform_int_so.o \
+set_int12_nc.o \
+newdq_ext.o \
 dvqpsi_mag_us.o \
 ef_shift.o \
 gmressolve_all.o \

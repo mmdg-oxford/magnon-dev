@@ -48,7 +48,7 @@ PROGRAM magnon
 
   USE io_global,       ONLY : stdout
   USE disp,            ONLY : nqs, num_k_pts, xk_kpoints, comp_iq
-  USE control_ph,      ONLY : epsil, trans, bands_computed,lgamma, dbext
+  USE control_ph,      ONLY : epsil, trans, bands_computed,lgamma, dbext, dvext
   USE output,          ONLY : fildrho
   USE check_stop,      ONLY : check_stop_init
   USE ph_restart,      ONLY : ph_writefile, destroy_status_run
@@ -90,8 +90,8 @@ PROGRAM magnon
   DO i = 1, nfs
      WRITE(stdout,'(8x, i4, 4x, 2f9.4)')i, fiu(i)*13.605
   ENDDO
-  WRITE(stdout, '(7x, "external magnetic field: Bx, By, Bz")')
-  WRITE(stdout, '(6F10.5)')dbext(1),dbext(2),dbext(3)
+  WRITE(stdout, '(7x, "external potential and magnetic field: Bx, By, Bz")')
+  WRITE(stdout, '(8F10.5)')dvext, dbext(1),dbext(2),dbext(3)
   
 
 
