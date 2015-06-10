@@ -64,7 +64,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE save_ph,              ONLY : tmp_dir_save
   ! used oly to write the restart file
   USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm, inter_image_comm, my_image_id
-  USE mp,                   ONLY : mp_sum
+  USE mp,                   ONLY : mp_sum, mp_barrier
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
   !
   implicit none
@@ -372,27 +372,15 @@ SUBROUTINE solve_linter (drhoscf, iw)
            cw = fiu(iw)
 
            if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
-!           if(.false.)then
-!           write(*,*)'static response'
-!           if(iw.eq.1) then
+
            call cgsolve_all (ch_psi_all, cg_psi, et(1,ikk), dvpsi, dpsi, &
                              h_diag, npwx, npwq, thresh, ik, lter, conv_root, &
                              anorm, nbnd_occ(ikk), npol )
-!                dpsim(:,:) = dpsip(:,:)
-!                dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
 
            else
-!               write(stdout,*)'cbcg_solve_start'
-              !cw = (0.01d0, 0.01)
-              ! cw = (0.0d0, 0.d0)
                call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
                      npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
 
-!               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsim, h_diag, &
-!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, -cw, .true.)
-
-!               dpsi(:,:) = dcmplx(0.5d0,0.0d0)*(dpsim(:,:) + dpsip(:,:)) 
-!               write(stdout,*)'cbcg_solve_end'
            endif
                    
 
@@ -401,9 +389,6 @@ SUBROUTINE solve_linter (drhoscf, iw)
            lintercall = lintercall + 1
 !           if (.not.conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
 !                &              " solve_linter: root not converged ",e10.3)') &
-!                &              ik , ibnd, anorm
-!          if (conv_root) WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4,  &
-!                &              " solve_linter: root converged ",e10.3)') &
 !                &              ik , ibnd, anorm
 
            !
@@ -474,6 +459,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
      drhoscfh =  CONJG(drhoscfh)
      end if
 
+!     call mp_barrier(inter_image_comm)
+!     call mp_synchronize(inter_image_comm)
      call mp_sum(drhoscf, inter_image_comm)
      call mp_sum(drhoscfh, inter_image_comm)
 
@@ -525,7 +512,6 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
 
      !
-!      if(iw.eq.1)then
       if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
       call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
                          alpha_mix(kter), dr2, tr2_ph/npol, iter, &
@@ -535,11 +521,13 @@ SUBROUTINE solve_linter (drhoscf, iw)
                              alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                              nmix_ph, convt)
       end if
+       
+      CALL check_all_convt(convt, iter)
 
-        if (lmetq0.and.convt) &
-         call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
+      if (lmetq0.and.convt) &
+      call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
      ! check that convergent have been reached on ALL processors in this image
-     CALL check_all_convt(convt)
+     ! CALL check_all_convt(convt)
 
      if (doublegrid) then
          do is = 1, nspin_mag
@@ -590,6 +578,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
   enddo    ! end of iter
 155 iter0=0
+  
   !
   !    A part of the dynamical matrix requires the integral of
   !    the self consistent change of the potential and the variation of
@@ -625,55 +614,48 @@ SUBROUTINE solve_linter (drhoscf, iw)
 END SUBROUTINE solve_linter
 
 
-SUBROUTINE setmixout(in1, in2, mix, dvscfout, dbecsum, ndim, flag )
-USE kinds, ONLY : DP
-USE mp_global, ONLY : intra_pool_comm
-USE mp, ONLY : mp_sum
-IMPLICIT NONE
-INTEGER :: in1, in2, flag, ndim, startb, lastb
-COMPLEX(DP) :: mix(in1+in2), dvscfout(in1), dbecsum(in2)
-
-CALL divide (intra_pool_comm, in2, startb, lastb)
-ndim=lastb-startb+1
-
-IF (flag==-1) THEN
-   mix(1:in1)=dvscfout(1:in1)
-   mix(in1+1:in1+ndim)=dbecsum(startb:lastb)
-ELSE
-   dvscfout(1:in1)=mix(1:in1)
-   dbecsum=(0.0_DP,0.0_DP)
-   dbecsum(startb:lastb)=mix(in1+1:in1+ndim)
-#ifdef __MPI
-   CALL mp_sum(dbecsum, intra_pool_comm)
-#endif
-ENDIF
-END SUBROUTINE setmixout
-
-SUBROUTINE check_all_convt(convt)
-  USE mp,        ONLY : mp_sum
-  USE mp_global, ONLY : nproc_image, me_image, intra_image_comm
+SUBROUTINE check_all_convt(convt, iter)
+  USE mp,        ONLY : mp_sum, mp_barrier
+  USE mp_global, ONLY : nproc_image, me_image, intra_image_comm, inter_image_comm
+  USE control_ph,           ONLY : niter_ph
+  USE io_global,            ONLY : stdout
   IMPLICIT NONE
-  LOGICAL,INTENT(in) :: convt
-  INTEGER,ALLOCATABLE :: convt_check(:)
+  LOGICAL,INTENT(inout) :: convt
+  INTEGER:: convt_check, iter
   !
-  IF(nproc_image==1) RETURN
+  ! IF(nproc_image==1) RETURN
   !
-  ALLOCATE(convt_check(nproc_image+1))
+  ! ALLOCATE(convt_check(nproc_image+1))
   !
   convt_check = 1
-  IF(convt) convt_check(me_image+1) = 0
+  IF(convt) convt_check = 0
   !
   CALL mp_sum(convt_check, intra_image_comm)
+  IF(convt .and. convt_check/=0) THEN
+    CALL errore('check_all_convt', 'Only some of the processors within each image converged: '&
+               &' something is wrong with solve_linter', 1)
+  ENDIF
+!  CALL mp_barrier(inter_image_comm)
+  CALL mp_sum(convt_check, inter_image_comm)
   !CALL mp_sum(ios, inter_pool_comm)
   !CALL mp_sum(ios, intra_pool_com)
   !
-!  convt = ALL(convt_check==0)
-  IF(ANY(convt_check==0).and..not.ALL(convt_check==0) ) THEN
-    CALL errore('check_all_convt', 'Only some processors converged: '&
-               &' something is wrong with solve_linter', 1)
+ ! convt = (convt_check==0)
+!  IF(ANY(convt_check==0).and..not.ALL(convt_check==0) ) THEN
+  IF(convt .and. convt_check/=0) THEN
+!  CALL errore('check_all_convt', '+q and -q did not converge with the same footing: '&
+!               &' something is wrong with solve_linter', 1)
+  IF(iter/=niter_ph)then
+  write(stdout,'(5x, "+q and -q did not converge with the same footing. Continue &
+               & until they all converges")')
+  convt = .false.
+  else
+  write(stdout,'(5x, "+q or -q did not converge.")')
+!  CALL errore('check_all_convt', '+q or -q did not converge: '&
+!               &' something is wrong with solve_linter', 1)
+  ENDIF
   ENDIF
   !
-  DEALLOCATE(convt_check)
   RETURN
   !
 END SUBROUTINE

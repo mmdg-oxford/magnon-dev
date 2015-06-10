@@ -148,14 +148,17 @@ call mp_sum(  b(1:nbnd) , intra_pool_comm )
 
         do ibnd = 1, nbnd
            call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1) !g=r_0=b-Ax
-           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
-!           gt(:,ibnd) =  g(:,ibnd)   ! HL
+!           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
+           gt(:,ibnd) =  g(:,ibnd)   
+           ! HL: for convergence with spin polarized along y
+           ! KC: This should not change the results as along as it converges
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
            call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)  !Copy g to h
            if(tprec) call cg_psi(ndmx, ndim, 1, h(1,ibnd), h_diag(1,ibnd) )
-           ht(:,ibnd) = dconjg( h(:,ibnd) )  
-!           ht(:,ibnd) =  h(:,ibnd)    !HL
+!           ht(:,ibnd) = dconjg( h(:,ibnd) )  
+           ht(:,ibnd) =  h(:,ibnd)    
+           ! HL: for convergence with spin polarized along y
         enddo
      endif
 
