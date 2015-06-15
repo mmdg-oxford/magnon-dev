@@ -36,7 +36,7 @@
 
   USE kinds,       ONLY : DP 
  ! USE control_gw,  ONLY : nmix_gw
-  USE mp_global,       ONLY : intra_pool_comm
+  USE mp_global,       ONLY : intra_pool_comm, my_image_id
   USE mp,              ONLY : mp_sum
 
   !max number of iterations used in mixing: n_iter must be.le.maxter
@@ -88,6 +88,8 @@
   call mp_sum (ndimtot, intra_pool_comm)
   !
   conv = dr2.lt.tr2
+
+  CALL check_all_convt(conv, iter)
   !
   if (iter.eq.1) then
      if (.not.allocated(df)) allocate (df( ndim , n_iter))
@@ -160,10 +162,16 @@ call mp_sum ( work(1:iter_used), intra_pool_comm )
      do j = 1, iter_used
         gamma = gamma + beta (j, i) * w (j) * work (j)
      enddo
-!
-     do n = 1, ndim
+!     if(my_image_id/=0)then
+
+       do n = 1, ndim
         vin (n) = vin (n) - w (i) * gamma * (alphamix * df (n, i) + dv (n, i) )
-     enddo
+       enddo
+!    else
+!       do n = 1, ndim
+!        vin (n) = vin (n) - w (i) * gamma * (alphamix * df (n, i) + dv (n, i) )
+!       enddo
+!    end if 
   enddo
 !
   inext = iter - ( (iter - 1) / n_iter) * n_iter

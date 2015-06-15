@@ -154,7 +154,7 @@ do iw =1, nfs
       IF (noncolin) THEN
         write(stdout,*)"density matrix response with G=G'=(0 0 0 )"
 !       G=G'= (0 0 0)
-        write(stdout,'("q,freq, drho, "5f10.5,"  ",8f10.6)') xq(:), fiu(iw)*13.6057, (real(drhoscfs (nls(1),ig)), ig = 1,4), &
+        write(stdout,'("q,freq, drho, "5f10.5,"  ",8f12.5)') xq(:), fiu(iw)*13.6057, (real(drhoscfs (nls(1),ig)), ig = 1,4), &
                                                                       (aimag(drhoscfs(nls(1),ig)), ig = 1,4) !KC
 !        write(stdout,'("im_drho", 3f12.5,"  ",4f14.7)') xq(:), (aimag(drhoscfs (nls(1),ig)), ig = 1,4)  !KC
 !      endif
