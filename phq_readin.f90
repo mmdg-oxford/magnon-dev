@@ -40,7 +40,8 @@ SUBROUTINE phq_readin()
                             nmix_ph, ldisp, recover, lrpa, lnoloc, start_irr, &
                             last_irr, start_q, last_q, current_iq, tmp_dir_ph, &
                             ext_recover, ext_restart, u_from_file, ldiag, &
-                            search_sym, lqdir, electron_phonon, do_elec, dbext, qplot, dvext!, do_trans
+                            search_sym, lqdir, electron_phonon, do_elec, dbext, qplot, dvext, &
+                            transverse!, do_trans
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
   USE qpoint,        ONLY : nksq, xq
@@ -96,7 +97,7 @@ SUBROUTINE phq_readin()
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star, kpoints, dbext, do_elec, dvext!, do_trans
+                       drho_star, dvscf_star, kpoints, dbext, do_elec, dvext, transverse!, do_trans
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -229,6 +230,7 @@ SUBROUTINE phq_readin()
   dvext = (0.d0, 0.d0)
 !
   do_elec = .FALSE.
+  transverse = .False.
   qplot = .false.
  ! okvan=.TRUE.
   kpoints = .TRUE.

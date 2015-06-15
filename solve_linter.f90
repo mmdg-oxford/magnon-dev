@@ -47,7 +47,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE control_ph,           ONLY : rec_code, niter_ph, nmix_ph, tr2_ph, &
                                    alpha_pv, lgamma, lgamma_gamma, convt, &
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
-                                   where_rec, flmixdpot, ext_recover, do_elec
+                                   where_rec, flmixdpot, ext_recover, do_elec, &
+                                   transverse
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, iudwf, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
@@ -69,7 +70,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   !
   implicit none
 
-  integer :: irr, npe, imode0
+  integer :: irr, npe, imode0, convt_check
   ! input: the irreducible representation
   ! input: the number of perturbation
   ! input: the position of the modes
@@ -460,7 +461,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
      end if
 
 !     call mp_barrier(inter_image_comm)
-!     call mp_synchronize(inter_image_comm)
+     call mp_synchronize(inter_image_comm)
      call mp_sum(drhoscf, inter_image_comm)
      call mp_sum(drhoscfh, inter_image_comm)
 
@@ -478,7 +479,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !
      ! q=0 in metallic case deserve special care (e_Fermi can shift)
      !
-     IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
+!     IF (lmetq0) call ef_shift(drhoscfh,ldos,ldoss,dos_ef,irr,npe,.false.)
      !
      !   After the loop over the perturbations we have the linear change
      !   in the charge density for each mode of this representation.
@@ -509,20 +510,63 @@ SUBROUTINE solve_linter (drhoscf, iw)
      call dv_of_drho (dvscfout(1,1), .false.)
      !
      !   And we mix with the old potential
-
+     ! KC: test dvscfout
+!write(stdout, '("dvscfin before mix", 2f10.6)') dvscfin(100,2)
+!write(stdout, '("dvscfout before mix", 4f10.6)') dvscfout(100,1), dvscfout(100,2)
 
      !
-      if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
-      call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
-                         alpha_mix(kter), dr2, tr2_ph/npol, iter, &
-                         nmix_ph, flmixdpot, convt)
+!      if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
+!      call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
+!                         alpha_mix(kter), dr2, tr2_ph/npol, iter, &
+!                         nmix_ph, flmixdpot, convt)
+!      else
+!     if(my_image_id==0)then
+      
+      if(transverse .and. .not. do_elec)then
+      call mix_potential_c(dfftp%nnr*2, dvscfout(1,2), dvscfin(1,2), &
+                             alpha_mix(kter), dr2, tr2_ph/npol, iter, &
+                             nmix_ph, convt)
       else
+
       call mix_potential_c(dfftp%nnr*nspin_mag, dvscfout, dvscfin, &    
                              alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                              nmix_ph, convt)
       end if
-       
-      CALL check_all_convt(convt, iter)
+!        if(convt)then 
+!        convt_check=1
+!        else
+!        convt_check=0
+!        end if
+!     end if
+!      if(my_image_id/=0)then
+!         dvscfout(:,:)=CONJG(dvscfout(:,:))
+!         dvscfin(:,:)=CONJG(dvscfin(:,:))
+     if(my_image_id/=0)then
+!         call mix_potential_c(dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
+!                             alpha_mix(kter), dr2, tr2_ph/npol, iter, &
+!                             nmix_ph, convt) 
+         dvscfin(:,:)=CONJG(dvscfin(:,:))
+!         dvscfin(:,:)=(0.d0, 0.d0)
+!         convt_check=0
+     end if
+
+      call mp_sum(dvscfin, inter_image_comm)
+!      call mp_sum(convt_check,inter_image_comm)
+   
+     if(my_image_id/=0)then
+         dvscfin(:,:)=CONJG(dvscfin(:,:)/2.d0)
+     else
+         dvscfin(:,:)=dvscfin(:,:)/2.d0
+     end if
+!         if(convt_check==1)then
+!          convt=.true.
+!         else
+!          convt=.false.
+!         end if         
+!     end if 
+
+!   write(stdout, '("dvscfin after mix", 4f10.6)') dvscfin(100,1), dvscfin(100,2)
+!      CALL check_all_convt(convt, iter)
 
       if (lmetq0.and.convt) &
       call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)

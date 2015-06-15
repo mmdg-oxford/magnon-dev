@@ -337,8 +337,8 @@ MODULE control_ph
              all_done, &      ! if .TRUE. all representations have been done
              newgrid=.FALSE., & ! if .TRUE. use new k-point grid nk1,nk2,nk3
              do_elec,  &
-             qplot     ! read in a set of q points other than one single q point
-
+             qplot, &     ! read in a set of q points other than one single q point
+             transverse
   !
 END MODULE control_ph
 !

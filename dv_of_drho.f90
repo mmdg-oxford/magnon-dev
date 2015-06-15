@@ -58,20 +58,20 @@ subroutine dv_of_drho (dvscf, add_nlcc)
   call start_clock ('dv_of_drho')
   allocate (dvaux( dfftp%nnr,  nspin_mag))
   dvaux (:,:) = (0.d0, 0.d0)
-  if (add_nlcc) allocate (drhoc( dfftp%nnr))
+!  if (add_nlcc) allocate (drhoc( dfftp%nnr))
   !
   ! the exchange-correlation contribution is computed in real space
   !
   if (lrpa) goto 111
   fac = 1.d0 / DBLE (nspin_lsda)
 
-  if (nlcc_any.and.add_nlcc) then
+!  if (nlcc_any.and.add_nlcc) then
 !     if (mode > 0) call addcore (mode, drhoc)
-     do is = 1, nspin_lsda
-        rho%of_r(:, is) = rho%of_r(:, is) + fac * rho_core (:)
-        dvscf(:, is) = dvscf(:, is) + fac * drhoc (:)
-     enddo
-  endif
+!     do is = 1, nspin_lsda
+!        rho%of_r(:, is) = rho%of_r(:, is) + fac * rho_core (:)
+!        dvscf(:, is) = dvscf(:, is) + fac * drhoc (:)
+!     enddo
+!  endif
 
   do is = 1, nspin_mag
      do is1 = 1, nspin_mag
@@ -89,12 +89,12 @@ subroutine dv_of_drho (dvscf, add_nlcc)
   if ( dft_is_gradient() ) call dgradcorr &
        (rho%of_r, grho, dvxc_rr, dvxc_sr, dvxc_ss, dvxc_s, xq, &
        dvscf, dfftp%nnr, nspin_mag, nspin_gga, nl, ngm, g, alat, dvaux)
-  if (nlcc_any.and.add_nlcc) then
-     do is = 1, nspin_lsda
-        rho%of_r(:, is) = rho%of_r(:, is) - fac * rho_core (:)
-        dvscf(:, is) = dvscf(:, is) - fac * drhoc (:)
-     enddo
-  endif
+!  if (nlcc_any.and.add_nlcc) then
+!     do is = 1, nspin_lsda
+!        rho%of_r(:, is) = rho%of_r(:, is) - fac * rho_core (:)
+!        dvscf(:, is) = dvscf(:, is) - fac * drhoc (:)
+!     enddo
+!  endif
 
 
 111 continue
@@ -151,7 +151,7 @@ subroutine dv_of_drho (dvscf, add_nlcc)
     dvscf (:,:) = dvaux (:,:)
   endif
   !
-  if (add_nlcc) deallocate (drhoc)
+ ! if (add_nlcc) deallocate (drhoc)
   deallocate (dvaux)
   call stop_clock ('dv_of_drho')
   return
