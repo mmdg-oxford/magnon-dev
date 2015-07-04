@@ -32,7 +32,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE ener,                 ONLY : ef
   USE klist,                ONLY : lgauss, degauss, ngauss, xk, wk, nkstot
   USE gvect,                ONLY : g
-  USE gvecs,                ONLY : doublegrid
+  USE gvecs,                ONLY : doublegrid, nls
   USE fft_base,             ONLY : dfftp, dffts
   USE lsda_mod,             ONLY : lsda, nspin, current_spin, isk
   USE spin_orb,             ONLY : domag
@@ -48,7 +48,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    alpha_pv, lgamma, lgamma_gamma, convt, &
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover, do_elec, &
-                                   transverse
+                                   transverse, dbext, lrpa, dvext
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, iudwf, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
@@ -67,6 +67,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm, inter_image_comm, my_image_id
   USE mp,                   ONLY : mp_sum, mp_barrier
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
+  USE fft_interfaces, ONLY: fwfft, invfft
   !
   implicit none
 
@@ -111,7 +112,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
   logical :: conv_root,  & ! true if linear system is converged
              exst,       & ! used to open the recover file
-             lmetq0        ! true if xq=(0,0,0) in a metal
+             lmetq0,     &   ! true if xq=(0,0,0) in a metal
+             convtm
 
   integer :: kter,       & ! counter on iterations
              iter0,      & ! starting iteration
@@ -130,8 +132,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
              na,         & ! counter on atoms
              nrec,       & ! the record number for dvpsi and dpsi
              ios,        & ! integer variable for I/O control
-             mode          ! mode index
-
+             mode,       &   ! mode index
+             im
   integer  :: iq_dummy
   real(DP) :: tcpu, get_clock ! timing variables
   character(len=256) :: filename
@@ -342,7 +344,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !For frequency dependent case we will require two more wave functions
  !             call davcio ( dpsip, lrdwf, iudwfp, nrec, -1)
  !             call davcio ( dpsim, lrdwf, iudwfm, nrec, -1)
-
+ !              dpsi(:,:) = (0.d0, 0.d0)
               !
               ! threshold for iterative solution of the linear system
               !
@@ -452,21 +454,21 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !
      !   Reduce the delta rho across pools
      !
-     call mp_sum ( drhoscf, inter_pool_comm )
+!     call mp_sum ( drhoscf, inter_pool_comm )
      call mp_sum ( drhoscfh, inter_pool_comm )
 
      if(my_image_id/=0)then
-     drhoscf =  CONJG(drhoscf)
+!     drhoscf =  CONJG(drhoscf)
      drhoscfh =  CONJG(drhoscfh)
      end if
 
 !     call mp_barrier(inter_image_comm)
-     call mp_synchronize(inter_image_comm)
-     call mp_sum(drhoscf, inter_image_comm)
+!     call mp_synchronize(inter_image_comm)
+!     call mp_sum(drhoscf, inter_image_comm)
      call mp_sum(drhoscfh, inter_image_comm)
 
      if(my_image_id/=0)then
-     drhoscf =  CONJG(drhoscf)
+!     drhoscf =  CONJG(drhoscf)
      drhoscfh =  CONJG(drhoscfh)
      end if
 
@@ -528,9 +530,18 @@ SUBROUTINE solve_linter (drhoscf, iw)
                              nmix_ph, convt)
       else
 
-      call mix_potential_c(dfftp%nnr*nspin_mag, dvscfout, dvscfin, &    
+      convt = .true.
+      convtm= .false.
+
+      do im=1,nspin_mag
+      
+      call mix_potential_c(dfftp%nnr, dvscfout(1,im), dvscfin(1,im), &
                              alpha_mix(kter), dr2, tr2_ph/npol, iter, &
-                             nmix_ph, convt)
+                             nmix_ph, convtm)
+      convt= (convt .and. convtm)
+      write(stdout, *)im
+      end do
+
       end if
 !        if(convt)then 
 !        convt_check=1
@@ -569,7 +580,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !      CALL check_all_convt(convt, iter)
 
       if (lmetq0.and.convt) &
-      call ef_shift (drhoscf, ldos, ldoss, dos_ef, irr, npe, .true.)
+      call ef_shift (drhoscfh, ldos, ldoss, dos_ef, irr, npe, .true.)
      ! check that convergent have been reached on ALL processors in this image
      ! CALL check_all_convt(convt)
 
@@ -607,7 +618,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
      if (check_stop_now()) call stop_smoothly_ph (.false.)
 !Well spotted Kun!
-   if (convt) then
+!   if (convt) then
      if (doublegrid) then
         do is = 1, nspin_mag
               call cinterpolate (drhoscfh(1,is), drhoscf(1,is), -1)
@@ -615,8 +626,50 @@ SUBROUTINE solve_linter (drhoscf, iw)
      else
         call zcopy (nspin_mag*dfftp%nnr, drhoscfh, 1, drhoscf, 1)
      endif
-   end if
-!  KC   if (convt) call zcopy (dfftp%nnr*nspin_mag, drhoscfh(1,1), 1, drhoscf(1,1), 1)
+
+
+     if(noncolin)then 
+         do ig=1, nspin_mag
+           CALL fwfft ('Smooth', drhoscf(:,ig), dffts)
+         enddo
+          
+         write(stdout,'(5x," q,freq,drho, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (nls(1),ig)), ig = 1,4), &
+                                                          (aimag(drhoscf(nls(1),ig)), ig = 1,4)
+
+        if(transverse) then
+        WRITE(stdout, '(5x,"transverse magnetic response" )')
+        if(convt)then
+          write(stdout,'(5x,"freq, convtchiq+-, "f12.5,"  ",4f14.7)') real(fiu(iw))*13605.7, &
+          real((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
+          aimag((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0),&
+          real((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
+          aimag((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0)
+        else
+          write(stdout,'(5x,"freq, chiq+-, "f12.5,"  ",4f14.7)') real(fiu(iw))*13605.7, &
+          real((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
+          aimag((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0),&
+          real((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
+          aimag((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0)
+        end if
+        end if
+     end if
+
+     if(do_elec) then
+!         do ig=1, nspin_mag
+           CALL fwfft ('Smooth', dvscfins(:,1), dffts)
+!         enddo
+          if(convt)then
+          write(stdout,'(5x,"q,freq,real(convteps),im(eps) "5f12.5," ",4f14.7)') xq(:), fiu(iw), &
+          real((1.0/(1.0d0 + dvscfins (nls(1),1)))), aimag((1.0/(1.0d0+ dvscfins (nls(1),1)))), &
+          (1.0d0 + real(dvscfins (nls(1),1))), aimag(dvscfins(nls(1),1))
+          else
+          write(stdout,'(5x,"q,freq,real(eps),im(eps) "5f12.5," ",4f14.7)') xq(:), fiu(iw), &
+          real((1.0/(1.0d0 + dvscfins (nls(1),1)))), aimag((1.0/(1.0d0+ dvscfins(nls(1),1)))), &
+          (1.0d0 + real(dvscfins (nls(1),1))), aimag(dvscfins(nls(1),1))
+          end if
+     end if
+     
+!   end if
      if (convt) goto 155
 
 
@@ -629,11 +682,11 @@ SUBROUTINE solve_linter (drhoscf, iw)
   !    the charge due to the displacement of the atoms.
   !    We compute it here.
   !
-  if(do_elec) then
+!  if(do_elec) then
 
   !  drhoscf(:,:) = dvscfin(:,:)
-     drhoscf(:,:) = dvscfins(:,:)  !KC
-  endif
+!     drhoscf(:,:) = dvscfins(:,:)  !KC
+!  endif
 
 
   if (allocated(ldoss)) deallocate (ldoss)
