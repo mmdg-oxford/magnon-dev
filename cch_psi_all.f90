@@ -92,6 +92,9 @@ SUBROUTINE cch_psi_all (n, h, ah, e, cw, ik, m)
 
   IF(gamma_only) THEN
 
+!We do not need the projector on the left hand side of the SH equation in the 
+!frequency dependent case
+
        CALL ch_psi_all_gamma()
 
     ELSE
@@ -134,7 +137,9 @@ CONTAINS
     
     IF (noncolin) THEN
        CALL zgemm ('C', 'N', nbnd_occ (ikq) , m, npwx*npol, (1.d0, 0.d0) , evq, &
-            npwx*npol, spsi, npwx*npol, (0.d0, 0.d0) , ps, nbnd)
+            npwx*npol, spsi, npwx*npol, (0.d0, 0.d0) , ps, nbnd) 
+
+! ps=evq*spsi
     ELSE
        CALL zgemm ('C', 'N', nbnd_occ (ikq) , m, n, (1.d0, 0.d0) , evq, &
             npwx, spsi, npwx, (0.d0, 0.d0) , ps, nbnd)

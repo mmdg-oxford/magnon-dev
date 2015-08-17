@@ -65,13 +65,13 @@ subroutine dv_of_drho (dvscf, add_nlcc)
   if (lrpa) goto 111
   fac = 1.d0 / DBLE (nspin_lsda)
 
-!  if (nlcc_any.and.add_nlcc) then
+  if (nlcc_any.and.add_nlcc) then
 !     if (mode > 0) call addcore (mode, drhoc)
-!     do is = 1, nspin_lsda
-!        rho%of_r(:, is) = rho%of_r(:, is) + fac * rho_core (:)
+     do is = 1, nspin_lsda
+        rho%of_r(:, is) = rho%of_r(:, is) + fac * rho_core (:)
 !        dvscf(:, is) = dvscf(:, is) + fac * drhoc (:)
-!     enddo
-!  endif
+     enddo
+  endif
 
   do is = 1, nspin_mag
      do is1 = 1, nspin_mag
@@ -89,12 +89,12 @@ subroutine dv_of_drho (dvscf, add_nlcc)
   if ( dft_is_gradient() ) call dgradcorr &
        (rho%of_r, grho, dvxc_rr, dvxc_sr, dvxc_ss, dvxc_s, xq, &
        dvscf, dfftp%nnr, nspin_mag, nspin_gga, nl, ngm, g, alat, dvaux)
-!  if (nlcc_any.and.add_nlcc) then
-!     do is = 1, nspin_lsda
-!        rho%of_r(:, is) = rho%of_r(:, is) - fac * rho_core (:)
+  if (nlcc_any.and.add_nlcc) then
+     do is = 1, nspin_lsda
+        rho%of_r(:, is) = rho%of_r(:, is) - fac * rho_core (:)
 !        dvscf(:, is) = dvscf(:, is) - fac * drhoc (:)
-!     enddo
-!  endif
+     enddo
+  endif
 
 
 111 continue
