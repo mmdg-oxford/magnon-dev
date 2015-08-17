@@ -71,6 +71,9 @@ if (lgauss) then
       CALL zgemm( 'C', 'N', nbnd, nbnd_occ (ikk), npwq, (1.d0,0.d0), &
                  evq, npwx, dvpsi, npwx, (0.d0,0.d0), ps, nbnd )
    END IF
+   !ps= <evq|dvscf|psi>
+
+
    !
    DO ibnd = 1, nbnd_occ (ikk)
       wg1 = wgauss ((ef-et(ibnd,ikk)) / degauss, ngauss)
@@ -80,6 +83,12 @@ if (lgauss) then
          deltae = et (jbnd, ikq) - et (ibnd, ikk)
          theta = wgauss (deltae / degauss, 0)
          wwg = wg1 * (1.d0 - theta) + wgp * theta
+
+!KC: We do not need the projector alpha_pv here in the frequency dependent case
+! where we could just simply add a tiny imaginary frequency to make the left
+! hand side of the equation nonsigular
+
+
          IF (jbnd <= nbnd_occ (ikq) ) THEN
             IF (abs (deltae) > 1.0d-5) THEN
                 wwg = wwg + alpha_pv * theta * (wgp - wg1) / deltae

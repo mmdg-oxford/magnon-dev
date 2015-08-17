@@ -154,13 +154,12 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
   call start_clock ('solve_linter')
 
-  allocate (dvscfin ( dfftp%nnr , nspin_mag))
+   allocate (dvscfin ( dfftp%nnr , nspin_mag))
   if (doublegrid) then
      allocate (dvscfins (dffts%nnr , nspin_mag))
   else
      dvscfins => dvscfin
   endif
- 
 !  allocate (dpsip(npwx*npol, nbnd))
 !  allocate (dpsim(npwx*npol, nbnd))
 
@@ -539,7 +538,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                              alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                              nmix_ph, convtm)
       convt= (convt .and. convtm)
-      write(stdout, *)im
+!      write(stdout, *)im
       end do
 
       end if
@@ -656,16 +655,17 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
      if(do_elec) then
 !         do ig=1, nspin_mag
-           CALL fwfft ('Smooth', dvscfins(:,1), dffts)
+           drhoscf(:,:) = dvscfins(:,:)
+           CALL fwfft ('Smooth', drhoscf(:,1), dffts)
 !         enddo
           if(convt)then
-          write(stdout,'(5x,"q,freq,real(convteps),im(eps) "5f12.5," ",4f14.7)') xq(:), fiu(iw), &
-          real((1.0/(1.0d0 + dvscfins (nls(1),1)))), aimag((1.0/(1.0d0+ dvscfins (nls(1),1)))), &
-          (1.0d0 + real(dvscfins (nls(1),1))), aimag(dvscfins(nls(1),1))
+          write(stdout,'(5x,"q,freq,real(convteps),im(convteps) "5f12.5," ",4f14.7)') xq(:), fiu(iw), &
+          real((1.0/(1.0d0 + drhoscf (nls(1),1)))), aimag((1.0/(1.0d0+ drhoscf (nls(1),1)))), &
+          (1.0d0 + real(drhoscf (nls(1),1))), aimag(drhoscf(nls(1),1))
           else
           write(stdout,'(5x,"q,freq,real(eps),im(eps) "5f12.5," ",4f14.7)') xq(:), fiu(iw), &
-          real((1.0/(1.0d0 + dvscfins (nls(1),1)))), aimag((1.0/(1.0d0+ dvscfins(nls(1),1)))), &
-          (1.0d0 + real(dvscfins (nls(1),1))), aimag(dvscfins(nls(1),1))
+          real((1.0/(1.0d0 + drhoscf (nls(1),1)))), aimag((1.0/(1.0d0+ drhoscf(nls(1),1)))), &
+          (1.0d0 + real(drhoscf (nls(1),1))), aimag(drhoscf(nls(1),1))
           end if
      end if
      
@@ -675,6 +675,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
   enddo    ! end of iter
 155 iter0=0
+
+!    if(convt)
   
   !
   !    A part of the dynamical matrix requires the integral of
@@ -702,8 +704,10 @@ SUBROUTINE solve_linter (drhoscf, iw)
   IF (noncolin) deallocate (dbecsum_nc)
   deallocate (dvscfout)
   deallocate (drhoscfh)
+
   if (doublegrid) deallocate (dvscfins)
   deallocate (dvscfin)
+
 !  deallocate (dpsip)
 !  deallocate (dpsim)
 
