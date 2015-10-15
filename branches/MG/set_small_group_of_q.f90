@@ -35,17 +35,17 @@
   sym(1:nsym)=.true.
   call smallg_q (xq, modenum, at, bg, nsym, s, ftau, sym, minus_q)
   IF ( .not. time_reversal ) minus_q = .false.
-  IF (modenum /= 0) THEN
+!  IF (modenum /= 0) THEN
 !
 !   in this case remove also the symmetries that do not send the mode
 !   in itself
 !
-     ALLOCATE(rtau (3, 48, nat))
-     CALL sgam_ph_new (at, bg, nsym, s, irt, tau, rtau, nat)
-     CALL mode_group (modenum, xq, at, bg, nat, nsym, s, irt, minus_q, &
-                                                            rtau, sym)
-     DEALLOCATE(rtau)
-  ENDIF
+!     ALLOCATE(rtau (3, 48, nat))
+!     CALL sgam_ph_new (at, bg, nsym, s, irt, tau, rtau, nat)
+!     CALL mode_group (modenum, xq, at, bg, nat, nsym, s, irt, minus_q, &
+!                                                            rtau, sym)
+!     DEALLOCATE(rtau)
+!  ENDIF
   nsymq = copy_sym ( nsym, sym )
   
   call inverse_s ( )

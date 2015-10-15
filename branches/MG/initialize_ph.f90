@@ -60,7 +60,7 @@ SUBROUTINE initialize_ph()
   !
   !  Output summary of the main variables of the phonon code
   !
-  !  CALL phq_summary()
+    CALL phq_summary()
   !
   !  Open the files of the phonon code
   !
