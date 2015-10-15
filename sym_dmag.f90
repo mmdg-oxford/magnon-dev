@@ -161,7 +161,7 @@ subroutine sym_dmag (nper, irr, dmagtosym)
                  do jpert = 1, nper
                     do is=2,4
                        dmags(is-1,ipert)=dmags(is-1,ipert) + &
-                            t (jpert, ipert, irot, irr) * &
+!                            t (jpert, ipert, irot, irr) * &
                             dmagtosym (ri, rj, rk, is, jpert) * phase (isym)
                     enddo
                  enddo

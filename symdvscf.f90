@@ -78,7 +78,8 @@ subroutine symdvscf (nper, irr, dvtosym)
                  do ipert = 1, nper
                     aux2 = (0.d0, 0.d0)
                     do jpert = 1, nper
-                       aux2 = aux2 + tmq (jpert, ipert, irr) * &
+                    !   aux2 = aux2 + tmq (jpert, ipert, irr) * &
+                        aux2 = aux2 + &
                             dvtosym (ri, rj, rk, is, jpert) * phase (1)
                     enddo
                     dvsym (i, j, k, ipert) = (dvtosym (i, j, k, is, ipert) +&
@@ -137,7 +138,7 @@ subroutine symdvscf (nper, irr, dvtosym)
                  do ipert = 1, nper
                     do jpert = 1, nper
                        dvsym (i, j, k, ipert) = dvsym (i, j, k, ipert) + &
-                            t (jpert, ipert, irot, irr) * &
+!                            t (jpert, ipert, irot, irr) * &
                             dvtosym (ri, rj, rk, is, jpert) * phase (isym)
                     enddo
                  enddo

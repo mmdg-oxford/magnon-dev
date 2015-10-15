@@ -15,6 +15,8 @@ subroutine sgam_ph_new (at, bg, nsym, s, irt, tau, rtau, nat)
   !     non zero only if fractional translations are present.
   !
   USE kinds, ONLY : DP
+  USE io_global,       ONLY : stdout
+
   implicit none
   !
   !     first the dummy variables
@@ -88,6 +90,9 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !  input-output variables
   !
   USE kinds, ONLY : DP
+  USE control_ph, only: dbext, do_elec
+  USE io_global,       ONLY : stdout
+  USE symm_base, only: sname
   implicit none
 
   real(DP), parameter :: accep = 1.e-5_dp
@@ -113,7 +118,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !  local variables
   !
 
-  real(DP) :: aq (3), raq (3), zero (3)
+  real(DP) :: aq (3), raq (3), zero (3), aBext(3), raBext(3)
   ! q vector in crystal basis
   ! the rotated of the q vector
   ! the zero vector
@@ -140,27 +145,41 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !   Transform xq to the crystal basis
   !
   aq = xq
-  call cryst_to_cart (1, aq, at, - 1)
+  abext(:)= real(dbext(:))
+!  call cryst_to_cart (1, aq, at, - 1)
+  call cryst_to_cart (1, aq, at, -1)
+  call cryst_to_cart (1, abext, at, -1)
+  !KC: for test 
+  write(stdout,'("aq, abext",6f10.5)')aq, abext
   !
   !   Test all symmetries to see if this operation send Sq in q+G or in -q+G
   !
   do irot = 1, nrot
      if (.not.sym (irot) ) goto 100
      raq(:) = 0.d0
+     rabext(:)=0.d0
      do ipol = 1, 3
         do jpol = 1, 3
            raq(ipol) = raq(ipol) + DBLE( s(ipol,jpol,irot) ) * aq( jpol)
+           rabext(ipol)=rabext(ipol)+ DBLE( s(ipol,jpol,irot) )*abext(jpol)
         enddo
      enddo
      sym (irot) = eqvect (raq, aq, zero, accep)
+    if (sname(irot)(1:3)=='inv') rabext=-rabext
+     
+     if(.not. do_elec) then
+       do ipol=1, 3
+          sym(irot)=sym(irot) .and. (abs(rabext(ipol)-abext(ipol))<1.0d-5)  
+       end do
+     end if 
      !
      !  if "iswitch.le.-3" (modenum.ne.0) S must be such that Sq=q exactly !
      !
-     if (modenum.ne.0 .and. sym(irot) ) then
-        do ipol = 1, 3
-           sym(irot) = sym(irot) .and. (abs(raq(ipol)-aq(ipol)) < 1.0d-5)
-        enddo
-     endif
+ !    if (modenum.ne.0 .and. sym(irot) ) then
+ !       do ipol = 1, 3
+ !          sym(irot) = sym(irot) .and. (abs(raq(ipol)-aq(ipol)) < 1.0d-5)
+ !       enddo
+ !    endif
 !     if (.not.minus_q) then
      if (sym(irot).and..not.minus_q) then
         raq = - raq
@@ -172,6 +191,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !  if "iswitch.le.-3" (modenum.ne.0) time reversal symmetry is not included !
   !
   if (modenum.ne.0) minus_q = .false.
+!     minus_q = .false.
   !
   return
 end subroutine smallg_q

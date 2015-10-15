@@ -36,7 +36,7 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   USE lsda_mod,           ONLY : lsda, nspin, current_spin, isk, &
                                  starting_magnetization
   USE symm_base,          ONLY : s, t_rev, irt, ftau, nrot, nsym, &
-                                 time_reversal, sname, d1, d2, d3, &
+                                 time_reversal, sname, d1, d2, d3, invsym, &
                                  copy_sym, s_axis_to_cart
   USE wvfct,              ONLY : nbnd, nbndx
   USE control_flags,      ONLY : ethr, isolve, david, max_cg_iter, &
@@ -91,6 +91,13 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   ! ... that are not symmetry operations of the small group of q
   !
   CALL set_small_group_of_q(nsymq,invsymq,minus_q)
+  write(stdout,*)'nsymq,nsym,minus_q',nsymq,nsym, minus_q
+  ! small group of q 
+
+  nsym=nsymq
+ 
+  invsym = invsymq
+
   !CALL mp_bcast (nsymq, root, world_comm)
   !
   ! ... Input k-points are assumed to be  given in the IBZ of the Bravais
@@ -112,7 +119,7 @@ SUBROUTINE setup_nscf ( newgrid, xq )
      ! In the case of electron-phonon matrix element with
      ! wannier functions the k-points should not be reduced
      !
-     t_rev(:) = 0
+!     t_rev(:) = 0
      skip_equivalence=.false.
 
      CALL kpoint_grid ( nrot, time_reversal, skip_equivalence, s, t_rev, &
