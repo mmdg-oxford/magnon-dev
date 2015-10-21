@@ -487,16 +487,16 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !   Here we symmetrize them ...
      !
      IF (.not.lgamma_gamma) THEN
-!#ifdef __MPI
-!        call psymdvscf (1, 1, drhoscfh)
-!        IF ( noncolin.and.domag ) &
-!        CALL psym_dmag( 1, 1, drhoscfh)
-!#else
-!        call symdvscf (1, 1, drhoscfh)
-!        IF ( noncolin.and.domag ) CALL sym_dmag( 1, 1, drhoscfh)
+#ifdef __MPI
+        call psymdvscf (1, 1, drhoscfh)
+        IF ( noncolin.and.domag ) &
+        CALL psym_dmag( 1, 1, drhoscfh)
+#else
+        call symdvscf (1, 1, drhoscfh)
+        IF ( noncolin.and.domag ) CALL sym_dmag( 1, 1, drhoscfh)
 !        call psym_dmage(dvtosym)
 !        call sym_dmage(dvtosym)
-!#endif
+#endif
 !        IF (okpaw) THEN
 !           IF (minus_q) CALL PAW_dumqsymmetrize(dbecsum,npe,irr, &
 !                             npertx,irotmq,rtau,xq,tmq)
@@ -639,6 +639,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
           
          write(stdout,'(5x," q,freq,drho, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (nls(1),ig)), ig = 1,4), &
                                                           (aimag(drhoscf(nls(1),ig)), ig = 1,4)
+         if(convt) write(stdout,'(5x," q,freq,convtdrho, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (nls(1),ig)), ig = 1,4), &
+                                                          (aimag(drhoscf(nls(1),ig)),ig = 1,4)
 
         if(transverse) then
         WRITE(stdout, '(5x,"transverse magnetic response" )')

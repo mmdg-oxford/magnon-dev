@@ -18,6 +18,7 @@ subroutine set_giq (xq,s,nsymq,nsym,irotmq,minus_q,gi,gimq)
   USE kinds, ONLY : DP
   USE cell_base, ONLY : bg, at
   USE control_ph, ONLY : lgamma
+  USE io_global, ONLY: stdout
   implicit none
 
   REAL(DP), PARAMETER :: accep=1.e-5_dp
@@ -81,6 +82,10 @@ subroutine set_giq (xq,s,nsymq,nsym,irotmq,minus_q,gi,gimq)
      enddo
      call cryst_to_cart (1, wrk, bg, 1)
      gi (:, isym) = wrk (:)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!     !KC: for test purpose
+!     Write(stdout,*)'isym,gi',isym, gi(:,isym)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      IF (irotmq == 0) THEN
         raq=-raq
         IF (eqvect (raq, aq, zero, accep)) THEN

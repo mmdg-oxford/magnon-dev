@@ -209,7 +209,8 @@ subroutine phq_setup
      !   small = 6.9626525973374d-5  ! corresponds to 3 gaussian sigma
      !   small = 6.3491173359333d-8  ! corresponds to 4 gaussian sigma
      !
-     small = 6.9626525973374d-5
+        small = 6.9626525973374d-5
+     !    small = 6.3491173359333d-8
      !
      ! - appropriate limit for gaussian broadening (used for all ngauss)
      !

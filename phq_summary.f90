@@ -37,7 +37,7 @@ subroutine phq_summary
   USE freq_ph,       ONLY : fpol, nfs, fiu
   USE partial,       ONLY : atomo, nat_todo, all_comp, done_irr, comp_irr
   USE modes,         ONLY : u, npert, irotmq, minus_q, nsymq, nirr, &
-                            name_rap_mode
+                            name_rap_mode, gi
   USE qpoint,        ONLY : xq
   USE control_flags, ONLY : iverbosity
   USE wvfct,         ONLY : ecutwfc
@@ -154,8 +154,10 @@ subroutine phq_summary
            WRITE( stdout, '(/,5x,"This transformation sends q -> -q+G")')
         else
            isym = isymq
+          ! WRITE( stdout,'(/,5x,"This transformation sends q -> q+G, with isym,gi",i3,3f5.1)')isym, gi
         endif
         WRITE( stdout, '(/6x,"isym = ",i2,5x,a45/)') isymq, sname (isym)
+        WRITE( stdout,'(/,5x,"This transformation sends q -> q+G, with gi",3f5.1/)')gi(:,isymq)
         IF (noncolin.and.domag) &
             WRITE(stdout,'(1x, "Time Reversal",i3)') t_rev(isym)
 
