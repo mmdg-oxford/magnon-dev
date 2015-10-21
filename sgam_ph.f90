@@ -146,7 +146,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !
   aq = xq
   abext(:)= real(dbext(:))
-!  call cryst_to_cart (1, aq, at, - 1)
+
   call cryst_to_cart (1, aq, at, -1)
   call cryst_to_cart (1, abext, at, -1)
   !KC: for test 
@@ -154,7 +154,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !
   !   Test all symmetries to see if this operation send Sq in q+G or in -q+G
   !
-!IF(symoff==.false.)then
+
   do irot = 1, nrot
      if (.not.sym (irot) ) goto 100
      if (t_rev(irot)==1) then
@@ -194,9 +194,6 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
 100  continue
   enddo
 
-!ELSE
-!    sym(irot)= .false.
-!END IF
   !
   !  if "iswitch.le.-3" (modenum.ne.0) time reversal symmetry is not included !
   !
