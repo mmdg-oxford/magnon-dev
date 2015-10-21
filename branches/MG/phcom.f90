@@ -338,7 +338,9 @@ MODULE control_ph
              newgrid=.FALSE., & ! if .TRUE. use new k-point grid nk1,nk2,nk3
              do_elec,  &
              qplot, &     ! read in a set of q points other than one single q point
-             transverse
+             transverse, & !If the response is transverse or not
+             symoff        ! if true turn off the symmetry, i.e. set nsym=1
+            
   !
 END MODULE control_ph
 !

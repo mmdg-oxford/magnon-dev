@@ -90,9 +90,9 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !  input-output variables
   !
   USE kinds, ONLY : DP
-  USE control_ph, only: dbext, do_elec
+  USE control_ph, only: dbext, do_elec, symoff
   USE io_global,       ONLY : stdout
-  USE symm_base, only: sname
+  USE symm_base, only: sname, t_rev
   implicit none
 
   real(DP), parameter :: accep = 1.e-5_dp
@@ -154,8 +154,13 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !
   !   Test all symmetries to see if this operation send Sq in q+G or in -q+G
   !
+!IF(symoff==.false.)then
   do irot = 1, nrot
      if (.not.sym (irot) ) goto 100
+     if (t_rev(irot)==1) then
+     sym (irot)= .false.
+     goto 100
+     end if
      raq(:) = 0.d0
      rabext(:)=0.d0
      do ipol = 1, 3
@@ -166,6 +171,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
      enddo
      sym (irot) = eqvect (raq, aq, zero, accep)
     if (sname(irot)(1:3)=='inv') rabext=-rabext
+    if (t_rev(irot)==1) rabext=-rabext
      
      if(.not. do_elec) then
        do ipol=1, 3
@@ -176,8 +182,8 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
      !  if "iswitch.le.-3" (modenum.ne.0) S must be such that Sq=q exactly !
      !
  !    if (modenum.ne.0 .and. sym(irot) ) then
- !       do ipol = 1, 3
- !          sym(irot) = sym(irot) .and. (abs(raq(ipol)-aq(ipol)) < 1.0d-5)
+ !      do ipol = 1, 3
+ !    if( sym(irot) .and. All(abs(raq(:)-aq(:)) < 1.0d-5)) 
  !       enddo
  !    endif
 !     if (.not.minus_q) then
@@ -187,6 +193,10 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
      endif
 100  continue
   enddo
+
+!ELSE
+!    sym(irot)= .false.
+!END IF
   !
   !  if "iswitch.le.-3" (modenum.ne.0) time reversal symmetry is not included !
   !
