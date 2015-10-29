@@ -170,7 +170,7 @@ call mp_sum(  b(1:nbnd) , intra_pool_comm )
             rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
             if(itol==1)rho(lbnd)=rho(lbnd)/b(ibnd)
              
-         !!!!! Here the convergence check is different from cg, why?
+         !!!!!KC: Here the convergence check is different from cg, why?
          !!!!! This is not a relative convergence threshold 
         endif
      enddo
