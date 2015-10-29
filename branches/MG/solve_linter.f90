@@ -362,7 +362,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
               ! starting threshold for iterative solution of the linear system
               !
               thresh = 1.0d-2
-              if(niter_ph==1)thresh = 1.d-5 ! * sqrt (tr2_ph)
+              if(niter_ph==1)thresh = 1.d-6 ! * sqrt (tr2_ph)
            endif
 
            !
@@ -380,7 +380,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                              anorm, nbnd_occ(ikk), npol )
 
            else
-               call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
+           call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
                      npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
 
            endif
@@ -524,6 +524,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !                         nmix_ph, flmixdpot, convt)
 !      else
 !     if(my_image_id==0)then
+      IF(niter_ph==1)alpha_mix=1.d0
       
       if(transverse .and. .not. do_elec)then
       call mix_potential_c(dfftp%nnr*2, dvscfout(1,2), dvscfin(1,2), &
@@ -534,17 +535,26 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !      convt = .true.
 !      convtm= .false.
 
-!      do im=1,nspin_mag
+!      do im=1,4,3
       
 !      call mix_potential_c(dfftp%nnr, dvscfout(1,im), dvscfin(1,im), &
 !                             alpha_mix(kter), dr2, tr2_ph/npol, iter, &
 !                             nmix_ph, convtm)
 !      convt= (convt .and. convtm)
+!      end do
 !      write(stdout, *)im
+
+       if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
+       call mix_potential (2*dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
+                         alpha_mix(kter), dr2, tr2_ph/npol, iter, &
+                         nmix_ph, flmixdpot, convt)
+       else
        call mix_potential_c(dfftp%nnr*nspin_mag, dvscfout, dvscfin, &
                              alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                              nmix_ph, convt)
-!      end do
+       end if
+!       dvscfout(:,2)=dvscfin(:,2)
+!       dvscfout(:,3)=dvscfin(:,3)
 
       end if
 !        if(convt)then 
@@ -662,7 +672,12 @@ SUBROUTINE solve_linter (drhoscf, iw)
 
      if(do_elec) then
 !         do ig=1, nspin_mag
-           drhoscf(:,:) = dvscfins(:,:)
+           IF(nspin_mag==2)then
+           drhoscf(:,1) = (dvscfins(:,1)+dvscfins(:,2))/2
+           ELSE
+           drhoscf(:,1) = dvscfins(:,1)
+           END IF
+
            CALL fwfft ('Smooth', drhoscf(:,1), dffts)
 !         enddo
           if(convt)then

@@ -63,7 +63,6 @@ io_pattern.o \
 localdos.o \
 mix_pot.o \
 mix_pot_c.o \
-mix_pot_s.o \
 mode_group.o \
 newdq.o \
 openfilq.o \
