@@ -17,7 +17,7 @@ SUBROUTINE phq_readin()
   !
   !
   USE kinds,         ONLY : DP
-  USE parameters,    ONLY : nsx
+  USE parameters,    ONLY : nsx, npk
   USE constants,     ONLY : RYTOEV
   USE ions_base,     ONLY : nat, ntyp => nsp
   USE io_global,     ONLY : ionode_id
@@ -25,7 +25,7 @@ SUBROUTINE phq_readin()
   USE ions_base,     ONLY : amass, atm
   USE input_parameters, ONLY : max_seconds, nk1, nk2, nk3, k1, k2, k3
   USE start_k,       ONLY : reset_grid
-  USE klist,         ONLY : xk, nks, nkstot, lgauss, two_fermi_energies, lgauss
+  USE klist,         ONLY : xk, nks,wk, nkstot, lgauss, two_fermi_energies, lgauss
   USE ktetra,        ONLY : ltetra
   USE control_flags, ONLY : gamma_only, tqr, restart, lkpoint_dir
   USE uspp,          ONLY : okvan
@@ -41,7 +41,7 @@ SUBROUTINE phq_readin()
                             last_irr, start_q, last_q, current_iq, tmp_dir_ph, &
                             ext_recover, ext_restart, u_from_file, ldiag, &
                             search_sym, lqdir, electron_phonon, do_elec, dbext, qplot, dvext, &
-                            transverse, symoff
+                            transverse, symoff, man_kpoints, qpoints
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
   USE qpoint,        ONLY : nksq, xq
@@ -97,7 +97,8 @@ SUBROUTINE phq_readin()
                        fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star, kpoints, dbext, do_elec, dvext, transverse, symoff
+                       drho_star, dvscf_star, qpoints, dbext, do_elec, &
+                       dvext, transverse, symoff, man_kpoints
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -234,7 +235,8 @@ SUBROUTINE phq_readin()
   symoff = .false.
   qplot = .false.
  ! okvan=.TRUE.
-  kpoints = .TRUE.
+  qpoints = .TRUE.
+  man_kpoints = .FALSE.
   !
   drho_star%open = .FALSE.
   drho_star%basis = 'modes'
@@ -306,37 +308,37 @@ SUBROUTINE phq_readin()
   !      READ (5, *, iostat = ios) (xq (ipol), ipol = 1, 3)
   !END IF
 
- IF (kpoints) then
+ IF (qpoints) then
      num_k_pts = 0
      IF (ionode) THEN
         READ (5, *, iostat = ios) card
  !       print*, card
-        IF ( TRIM(card)=='K_POINTS'.OR. &
-             TRIM(card)=='k_points'.OR. &
-             TRIM(card)=='K_points') THEN
+        IF ( TRIM(card)=='QPOINTS'.OR. &
+             TRIM(card)=='qpoints'.OR. &
+             TRIM(card)=='Qpoints') THEN
            READ (5, *, iostat = ios) num_k_pts
         ENDIF
         print*, card
      ENDIF
      
      CALL mp_bcast(ios, ionode_id )
-     CALL errore ('gwq_readin', 'reading number of kpoints', ABS(ios) )
+     CALL errore ('phq_readin', 'reading number of qpoints', ABS(ios) )
      CALL mp_bcast(num_k_pts, ionode_id )
      nqs=num_k_pts
-     if (num_k_pts > 30) call errore('mag_readin','Too many k-points',1) 
-     if (num_k_pts < 1) call errore('mag_readin','Too few kpoints',1) 
+     if (num_k_pts > 50) call errore('phq_readin','Too many qpoints',1) 
+     if (num_k_pts < 1) call errore('phq_readin','Too few qpoints',1) 
      IF (ionode) THEN
-        IF ( TRIM(card)=='K_POINTS'.OR. &
-             TRIM(card)=='k_points'.OR. &
-             TRIM(card)=='K_points') THEN
+        !IF ( TRIM(card)=='K_POINTS'.OR. &
+        !     TRIM(card)=='k_points'.OR. &
+        !     TRIM(card)=='K_points') THEN
            DO i = 1, num_k_pts
              !should be in units of 2pi/a0 cartesian co-ordinates
               READ (5, *, iostat = ios) xk_kpoints(1,i), xk_kpoints(2,i), xk_kpoints(3,i)
            END DO
-        END IF
+        !END IF
      END IF
      CALL mp_bcast(ios, ionode_id)
-     CALL errore ('gwq_readin', 'reading KPOINTS card', ABS(ios) )
+     CALL errore ('phq_readin', 'reading QPOINTS card', ABS(ios) )
      CALL mp_bcast(xk_kpoints, ionode_id )
  ELSE
      num_k_pts = 1
@@ -431,9 +433,47 @@ end if
   ! read from input (this happens if nk1*nk2*nk3, else it returns .false.,
   ! leaves the current values, as read in read_file, unchanged)
   !
-  newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
+  !newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
+   newgrid = .true.
 
+
+  !KC: input for the new kpoints grid, which includes a coarse grid for ground state
+  !scf calculation and a dense selected grid for response only.
+  !The grid may be highly nonuniform
+  IF(ionode)OPEN(1111,file='KPOINTS',status='old')
+  
+  !KC: kpoints must be input in cartisian coordinates
+  IF (man_kpoints) then
+     nkstot = 0
+     IF (ionode) THEN
+        READ (1111, *, iostat = ios) card
+ !       print*, card
+        IF ( TRIM(card)=='KPOINTS'.OR. &
+             TRIM(card)=='kpoints'.OR. &
+             TRIM(card)=='Kpoints') THEN
+           READ (1111, *, iostat = ios) nkstot
+        ENDIF
+        print*, card
+     ENDIF
+
+     CALL mp_bcast(ios, ionode_id )
+     CALL errore ('phq_readin', 'reading number of kpoints', ABS(ios) )
+     CALL mp_bcast(nkstot, ionode_id )
+     if (num_k_pts > npk) call errore('phq_readin','Too many kpoints',1)
+     if (num_k_pts < 1) call errore('phq_readin','Too few kpoints',1)
+     IF (ionode) THEN
+           DO i = 1, nkstot
+             !should be in units of 2pi/a0 cartesian co-ordinates
+              READ (1111, *, iostat = ios) xk(1,i), xk(2,i), xk(3,i), wk(i)
+           END DO
+     END IF
+     CALL mp_bcast(ios, ionode_id)
+     CALL errore ('phq_readin', 'reading KPOINTS file', ABS(ios) )
+     CALL mp_bcast(xk, ionode_id)
  
+ ENDIF  
+  
+   
   !
   tmp_dir=tmp_dir_save
   !

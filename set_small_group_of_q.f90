@@ -23,7 +23,7 @@
   USE qpoint, ONLY : xq
   USE symm_base, ONLY : copy_sym, d1, d2, d3, inverse_s, s_axis_to_cart
   USE paw_variables, ONLY : okpaw
-  USE control_ph, only: symoff
+  USE control_ph, only: symoff,man_kpoints
   IMPLICIT NONE
 
   INTEGER, INTENT(INOUT) :: nsymq
@@ -48,7 +48,7 @@
 !     DEALLOCATE(rtau)
 !  ENDIF
   nsymq = copy_sym ( nsym, sym )
-  If(symoff)nsymq=1
+  If(man_kpoints .or. symoff)nsymq=1
   
   call inverse_s ( )
   !

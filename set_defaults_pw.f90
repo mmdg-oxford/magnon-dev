@@ -49,6 +49,7 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   USE paw_variables,      ONLY : okpaw
   USE modes,              ONLY : nsymq, invsymq, minus_q
   USE uspp_param,         ONLY : n_atom_wfc
+  USE control_ph,         ONLY : man_kpoints
  
   !
   IMPLICIT NONE
@@ -104,15 +105,15 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   ! ... lattice, with the full point symmetry of the lattice.
   !
  !print*, nks_start, newgrid
-  if( nks_start > 0 .AND. .NOT. newgrid ) then
+ ! if( nks_start > 0 .AND. .NOT. newgrid ) then
      !
      !  In this case I keep the same points of the Charge density
      !  calculations
      !
-     nkstot = nks_start
-     xk(:,1:nkstot) = xk_start(:,1:nkstot)
-     wk(1:nkstot)   = wk_start(1:nkstot)
-  else
+  !   nkstot = nks_start
+  !   xk(:,1:nkstot) = xk_start(:,1:nkstot)
+  !   wk(1:nkstot)   = wk_start(1:nkstot)
+ ! else
      !
      ! In this case I generate a new set of k-points
      !
@@ -120,22 +121,24 @@ SUBROUTINE setup_nscf ( newgrid, xq )
      ! wannier functions the k-points should not be reduced
      !
 !     t_rev(:) = 0
+     IF(.NOT. man_kpoints)THEN
      skip_equivalence=.false.
 
      CALL kpoint_grid ( nrot, time_reversal, skip_equivalence, s, t_rev, &
                       bg, nk1*nk2*nk3, k1,k2,k3, nk1,nk2,nk3, nkstot, xk, wk)
-  endif
+ 
+!  endif
 
   !
   ! ... If some symmetries of the lattice are missing in the crystal,
   ! ... "irreducible_BZ" computes the missing k-points.
   !
-  CALL irreducible_BZ (nrot, s, nsymq, minus_q, magnetic_sym, &
+     CALL irreducible_BZ (nrot, s, nsymq, minus_q, magnetic_sym, &
                        at, bg, npk, nkstot, xk, wk, t_rev)
-  !
+     ENDIF
   ! ... add k+q to the list of k
   !
-  CALL set_kplusq( xk, wk, xq, nkstot, npk )
+     CALL set_kplusq( xk, wk, xq, nkstot, npk )
   !
   IF ( lsda ) THEN
      !

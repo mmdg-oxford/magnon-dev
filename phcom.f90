@@ -339,7 +339,9 @@ MODULE control_ph
              do_elec,  &
              qplot, &     ! read in a set of q points other than one single q point
              transverse, & !If the response is transverse or not
-             symoff        ! if true turn off the symmetry, i.e. set nsym=1
+             symoff, &        ! if true turn off the symmetry, i.e. set nsym=1
+             man_kpoints, &   ! manual input of all kpoints
+             qpoints         ! qpoints card in the input file
             
   !
 END MODULE control_ph
