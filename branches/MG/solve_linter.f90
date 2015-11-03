@@ -48,7 +48,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    alpha_pv, lgamma, lgamma_gamma, convt, &
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover, do_elec, &
-                                   transverse, dbext, lrpa, dvext
+                                   transverse, dbext, lrpa, dvext, man_kpoints, &
+                                   symoff
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, iudwf, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
@@ -486,6 +487,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
      !   in the charge density for each mode of this representation.
      !   Here we symmetrize them ...
      !
+  IF((.not. man_kpoints) .and. (.not. symoff)) then 
      IF (.not.lgamma_gamma) THEN
 #ifdef __MPI
         call psymdvscf (1, 1, drhoscfh)
@@ -504,6 +506,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !              PAW_dusymmetrize(dbecsum,npe,irr,npertx,nsymq,rtau,xq,t)
 !        END IF
      ENDIF
+  END IF
      !
      !   ... save them on disk and
      !   compute the corresponding change in scf potential
