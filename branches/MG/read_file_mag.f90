@@ -201,7 +201,7 @@ SUBROUTINE read_xml_file()
   ! ... nks is defined by the following routine as the number 
   ! ... of k-points in the current pool
   !
-  !CALL divide_et_impera( xk, wk, isk, lsda, nkstot, nks )  KC
+  !CALL divide_et_impera( xk, wk, isk, lsda, nkstot, nks ) ! KC
   nks=nkstot    !KC
   !
   !CALL poolscatter( nbnd, nkstot, et, nks, et )

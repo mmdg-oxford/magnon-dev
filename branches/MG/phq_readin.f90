@@ -433,7 +433,7 @@ end if
   ! read from input (this happens if nk1*nk2*nk3, else it returns .false.,
   ! leaves the current values, as read in read_file, unchanged)
   !
-  !newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
+  !IF(.not. man_kpoints)newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
    newgrid = .true.
 
 
@@ -470,6 +470,7 @@ end if
      CALL mp_bcast(ios, ionode_id)
      CALL errore ('phq_readin', 'reading KPOINTS file', ABS(ios) )
      CALL mp_bcast(xk, ionode_id)
+     CALL mp_bcast(wk, ionode_id)
  
  ENDIF  
   
@@ -534,14 +535,14 @@ end if
   !  leave values read from file otherwise
   !
   lgamma_gamma=.FALSE.
-  IF (.NOT.ldisp) THEN
-     !
-     IF (lgamma) THEN
-        nksq = nks
-     ELSE
-        nksq = nks / 2
-     ENDIF
-  ENDIF
+!  IF (.NOT.ldisp) THEN
+!     !
+!     IF (lgamma) THEN
+!        nksq = nks
+!     ELSE
+!        nksq = nks / 2
+!     ENDIF
+!  ENDIF
   !
   !
   !
