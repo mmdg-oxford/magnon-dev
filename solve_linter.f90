@@ -558,7 +558,6 @@ SUBROUTINE solve_linter (drhoscf, iw)
        end if
 !       dvscfout(:,2)=dvscfin(:,2)
 !       dvscfout(:,3)=dvscfin(:,3)
-
       end if
 !        if(convt)then 
 !        convt_check=1
@@ -709,11 +708,6 @@ SUBROUTINE solve_linter (drhoscf, iw)
   !    the charge due to the displacement of the atoms.
   !    We compute it here.
   !
-!  if(do_elec) then
-
-  !  drhoscf(:,:) = dvscfin(:,:)
-!     drhoscf(:,:) = dvscfins(:,:)  !KC
-!  endif
 
 
   if (allocated(ldoss)) deallocate (ldoss)
