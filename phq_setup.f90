@@ -161,6 +161,8 @@ subroutine phq_setup
   ENDIF
   !
   ! 3) Computes the derivative of the xc potential
+
+!IF(ionode)open(1118,file='dmuxc')
   !
   dmuxc(:,:,:) = 0.d0
   if (lsda) then
@@ -175,6 +177,10 @@ subroutine phq_setup
         do ir = 1, dfftp%nnr
            rhotot = rho%of_r (ir, 1) + rho_core (ir)
            call dmxc_nc (rhotot, rho%of_r(ir,2), rho%of_r(ir,3), rho%of_r(ir,4), auxdmuxc)
+
+!           IF(ionode)WRITE(1118,'(4f20.15)') rhotot, rho%of_r(ir,2), rho%of_r(ir,3), rho%of_r(ir,4)
+!           IF(ionode)WRITE(1118,'(16f10.5)')auxdmuxc
+
            DO is=1,nspin_mag
               DO js=1,nspin_mag
                  dmuxc(ir,is,js)=auxdmuxc(is,js)

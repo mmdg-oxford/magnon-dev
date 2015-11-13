@@ -440,7 +440,7 @@ end if
   !KC: input for the new kpoints grid, which includes a coarse grid for ground state
   !scf calculation and a dense selected grid for response only.
   !The grid may be highly nonuniform
-  IF(ionode)OPEN(1111,file='KPOINTS',status='old')
+  IF(ionode .and. man_kpoints)OPEN(1111,file='KPOINTS',status='old')
   
   !KC: kpoints must be input in cartisian coordinates
   IF (man_kpoints) then
