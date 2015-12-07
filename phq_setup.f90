@@ -368,11 +368,11 @@ subroutine phq_setup
   !
   ! Set flmixdpot
   !
-  if (reduce_io) then
-     flmixdpot = ' '
-  else
+!  if (reduce_io) then
+!     flmixdpot = ' '
+!  else
      flmixdpot = 'mixd'
-  endif
+!  endif
   !
   !
   ! 8) Set the ubar

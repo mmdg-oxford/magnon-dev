@@ -24,6 +24,7 @@ SUBROUTINE run_pwscf(do_band)
   USE save_ph,         ONLY : tmp_dir_save
   !
   USE scf,           ONLY : vrs
+  USE io_global,     ONLY : stdout
 
  !
   IMPLICIT NONE
@@ -55,8 +56,9 @@ SUBROUTINE run_pwscf(do_band)
   CALL setup_nscf ( newgrid, xq )
   CALL init_run()
   IF (do_band) CALL electrons()
+  
   !
-  IF (.NOT.reduce_io.and.do_band) THEN
+  IF (do_band) THEN
      twfcollect=.FALSE.
      CALL punch( 'all' )
      done_bands=.TRUE.

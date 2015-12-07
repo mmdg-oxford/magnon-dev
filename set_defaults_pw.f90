@@ -38,19 +38,19 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   USE symm_base,          ONLY : s, t_rev, irt, ftau, nrot, nsym, &
                                  time_reversal, sname, d1, d2, d3, invsym, &
                                  copy_sym, s_axis_to_cart
-  USE wvfct,              ONLY : nbnd, nbndx
+  USE wvfct,              ONLY : nbnd, nbndx, npwx
   USE control_flags,      ONLY : ethr, isolve, david, max_cg_iter, &
-                                 noinv, modenum, use_para_diag
+                                 noinv, modenum, use_para_diag, io_level
   USE mp_global,          ONLY : kunit
   USE spin_orb,           ONLY : domag
-  USE noncollin_module,   ONLY : noncolin
+  USE noncollin_module,   ONLY : noncolin, npol
   USE start_k,            ONLY : nks_start, xk_start, wk_start, &
                                  nk1, nk2, nk3, k1, k2, k3
   USE paw_variables,      ONLY : okpaw
   USE modes,              ONLY : nsymq, invsymq, minus_q
   USE uspp_param,         ONLY : n_atom_wfc
-  USE control_ph,         ONLY : man_kpoints
- 
+  USE control_ph,         ONLY : man_kpoints, reduce_io
+  USE wavefunctions_module, ONLY: evc0
   !
   IMPLICIT NONE
   !
@@ -199,6 +199,12 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   nks = nkstot
   !
 #endif
+
+IF(reduce_io)THEN
+allocate (evc0 ( npwx*npol , nbnd, nks))
+io_level = -5
+END IF
+!KC: allocate the space for storing wavefunctions in memory
   !
   RETURN
   !

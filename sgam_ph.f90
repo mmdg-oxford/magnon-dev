@@ -157,10 +157,10 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
 
   do irot = 1, nrot
      if (.not.sym (irot) ) goto 100
-!     if (t_rev(irot)==1) then
-!     sym (irot)= .false.
-!     goto 100
-!     end if
+     if (t_rev(irot)==1) then
+     sym (irot)= .false.
+     goto 100
+     end if
      raq(:) = 0.d0
      rabext(:)=0.d0
      do ipol = 1, 3

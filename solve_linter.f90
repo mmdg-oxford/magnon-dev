@@ -26,7 +26,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE io_global,            ONLY : stdout, ionode
   USE io_files,             ONLY : prefix, iunigk, diropn
   USE check_stop,           ONLY : check_stop_now
-  USE wavefunctions_module, ONLY : evc
+  USE wavefunctions_module, ONLY : evc, evc0
   USE constants,            ONLY : degspin
   USE cell_base,            ONLY : at, tpiba2
   USE ener,                 ONLY : ef
@@ -49,14 +49,14 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover, do_elec, &
                                    transverse, dbext, lrpa, dvext, man_kpoints, &
-                                   symoff
+                                   symoff, reduce_io
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, iudwf, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
                                    this_pcxpsi_is_on_file
   USE output,               ONLY : fildrho, fildvscf
   USE phus,                 ONLY : int3_paw, becsumort
-  USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec  !, dpsip,dpsim
+  USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec, dvpsi0, dpsi0  !, dpsip,dpsim
   USE qpoint,               ONLY : xq, npwq, igkq, nksq, ikks, ikqs
   USE modes,                ONLY : npertx, npert, u, t, irotmq, tmq, &
                                    minus_q, nsymq, rtau
@@ -205,6 +205,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   if (lmetq0) then
         allocate ( ldos ( dfftp%nnr  , nspin_mag) )
         allocate ( ldoss( dffts%nnr , nspin_mag) )
+        write(stdout,*)'test local dos'
         call localdos ( ldos , ldoss , dos_ef )
   write(stdout, *)'dos_ef', dos_ef
   endif
@@ -256,6 +257,17 @@ SUBROUTINE solve_linter (drhoscf, iw)
         !
         ! reads unperturbed wavefuctions psi(k) and psi(k+q)
         !
+IF(reduce_io)THEN 
+        if (nksq.gt.1) then
+           if (lgamma) then
+              evc(:,:)=evc0(:,:,ikk)
+           else
+              evc(:,:)=evc0(:,:,ikk)
+              evq(:,:)=evc0(:,:,ikq)
+           endif
+
+        endif
+ELSE
         if (nksq.gt.1) then
            if (lgamma) then
               call davcio (evc, lrwfc, iuwfc, ikk, - 1)
@@ -265,6 +277,8 @@ SUBROUTINE solve_linter (drhoscf, iw)
            endif
 
         endif
+END IF
+
         !
         ! compute the kinetic energy
         !
@@ -297,7 +311,11 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !
               ! After the first iteration dvbare_q*psi_kpoint is read from file
               !
+              IF(reduce_io)THEN
+              dvpsi(:,:)=dvpsi0(:,:,ik)
+              ELSE
               call davcio (dvpsi, lrbar, iubar, nrec, - 1)
+              ENDIF
               !
               ! calculates dvscf_q*psi_k in G_space, for all bands, k=kpoint
               ! dvscf_q from previous iteration (mix_potential)
@@ -327,7 +345,13 @@ SUBROUTINE solve_linter (drhoscf, iw)
                call dvqpsi_mag_us (ik, .false.)
              ! add the augmentation charge term for dvext and dbext
                call adddvscf (1, ik)
+
+               IF(reduce_io) THEN
+               dvpsi0(:,:,ik)=dvpsi(:,:)
+               ELSE
                call davcio (dvpsi, lrbar, iubar, nrec, 1)
+               END IF
+               
            endif
            !
            ! Ortogonalize dvpsi to valence states: ps = <evq|dvpsi>
@@ -339,8 +363,11 @@ SUBROUTINE solve_linter (drhoscf, iw)
               !
               ! starting value for delta_psi is read from iudwf
               !
+              IF(reduce_io)THEN
+              dpsi(:,:)=dpsi0(:,:,ik)
+              ELSE
               call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
-
+              END IF 
 !For frequency dependent case we will require two more wave functions
  !             call davcio ( dpsip, lrdwf, iudwfp, nrec, -1)
  !             call davcio ( dpsim, lrdwf, iudwfm, nrec, -1)
@@ -401,7 +428,12 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !          call davcio (dpsip, lrdwf, iudwfp, nrec, + 1)
 !          call davcio (epsim, lrdwf, iudwfm, nrec, + 1)
 !       if(qpol ==1) then
+
+           IF(reduce_io)THEN
+           dpsi0(:,:,ik)=dpsi(:,:)
+           ELSE
            call davcio (dpsi, lrdwf, iudwf, nrec, + 1)
+           END IF
            !
            ! calculates dvscf, sum over k => dvscf_q_ipert
            !
@@ -595,8 +627,9 @@ SUBROUTINE solve_linter (drhoscf, iw)
 !   write(stdout, '("dvscfin after mix", 4f10.6)') dvscfin(100,1), dvscfin(100,2)
 !      CALL check_all_convt(convt, iter)
 
-      if (lmetq0.and.convt) &
-      call ef_shift (drhoscfh, ldos, ldoss, dos_ef, irr, npe, .true.)
+     if (lmetq0.and.convt) call ef_shift (drhoscfh, ldos, ldoss, dos_ef, irr, npe, .true.)
+
+
      ! check that convergent have been reached on ALL processors in this image
      ! CALL check_all_convt(convt)
 

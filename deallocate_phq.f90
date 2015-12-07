@@ -13,7 +13,7 @@ subroutine deallocate_phq
 !
   USE noncollin_module, ONLY : m_loc
   USE becmod, ONLY: bec_type, becp, deallocate_bec_type
-  USE wavefunctions_module,  ONLY: evc
+  USE wavefunctions_module,  ONLY: evc, evc0
   USE modes, ONLY : tmq, t, npert, u, rtau, name_rap_mode, num_rap_mode
   USE qpoint, ONLY : eigqts, igkq, ikks, ikqs, nksq
   USE efield_mod, ONLY : zstareu, zstarue, zstarue0, zstareu0, &
@@ -26,7 +26,7 @@ subroutine deallocate_phq
                     vsgga, segni
   USE gamma_gamma, ONLY : with_symmetry, has_equivalent, equiv_atoms, &
                    n_equiv_atoms
-  USE eqv,     ONLY : dmuxc, vlocq, dpsi, dvpsi, evq, eprec, dpsip, dpsim
+  USE eqv,     ONLY : dmuxc, vlocq, dpsi, dvpsi, evq, eprec, dvpsi0, dpsi0
   USE nlcc_ph, ONLY : drc
   USE units_ph, ONLY : this_dvkb3_is_on_file, this_pcxpsi_is_on_file
   USE dynmat, ONLY : dyn00, dyn_rec, dyn, w2
@@ -45,8 +45,11 @@ subroutine deallocate_phq
 
   if(allocated(dvpsi)) deallocate (dvpsi)
   if(allocated(dpsi)) deallocate ( dpsi)
-  if(allocated(dpsip)) deallocate ( dpsip)
-  if(allocated(dpsim)) deallocate ( dpsim)
+  if(allocated(dvpsi0)) deallocate (dvpsi0)
+  if(allocated(dpsi0)) deallocate ( dpsi0)  
+  if(allocated(evc0)) deallocate ( evc0)
+!  if(allocated(dpsip)) deallocate ( dpsip)
+!  if(allocated(dpsim)) deallocate ( dpsim)
   !
   if(allocated(vlocq)) deallocate (vlocq)
   if(allocated(dmuxc)) deallocate (dmuxc)
