@@ -433,7 +433,7 @@ end if
   ! read from input (this happens if nk1*nk2*nk3, else it returns .false.,
   ! leaves the current values, as read in read_file, unchanged)
   !
-  !IF(.not. man_kpoints)newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
+   IF(.not. man_kpoints)newgrid = reset_grid (nk1, nk2, nk3, k1, k2, k3)
    newgrid = .true.
 
 

@@ -35,11 +35,11 @@ subroutine allocate_phq
                    dpqq_so, alphasum, alphasum_nc, becsum_nc, &
                    becp1, alphap
   USE efield_mod, ONLY : zstareu, zstareu0, zstarue0, zstarue0_rec, zstarue
-  USE eqv, ONLY : dpsi, evq, vlocq, dmuxc, dvpsi, eprec, dpsip,dpsim
+  USE eqv, ONLY : dpsi, evq, vlocq, dmuxc, dvpsi, eprec,dpsi0,dvpsi0
   USE units_ph, ONLY : this_pcxpsi_is_on_file, this_dvkb3_is_on_file
   USE dynmat, ONLY : dyn00, dyn, dyn_rec, w2
   USE modes, ONLY : u, rtau, npert, name_rap_mode, num_rap_mode
-  USE control_ph, ONLY :  lgamma
+  USE control_ph, ONLY :  lgamma, reduce_io
 
 
   implicit none
@@ -63,8 +63,15 @@ subroutine allocate_phq
      allocate (igkq ( npwx))
   endif
   !
+  IF(reduce_io)then
+  allocate (dvpsi0 ( npwx*npol , nbnd, nksq))
+  allocate (dpsi0 ( npwx*npol , nbnd, nksq))
+  allocate ( dpsi ( npwx*npol , nbnd))
+  allocate (dvpsi ( npwx*npol , nbnd))
+  ELSE
   allocate (dvpsi ( npwx*npol , nbnd))
   allocate ( dpsi ( npwx*npol , nbnd))
+  END IF
  ! allocate ( dpsip ( npwx*npol , nbnd))
  ! allocate ( dpsim ( npwx*npol , nbnd))
   !

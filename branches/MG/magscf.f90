@@ -114,7 +114,7 @@ do iw =1, nfs
           !
           DO i = 1, 3
              !
-             magtot_nc(i) = magtot_nc(i) * omega / (dfftp%nr1*dfftp%nr2*dfftp%nr3 )
+             magtot_nc(i) = magtot_nc(i) * omega / (dffts%nr1*dffts%nr2*dffts%nr3 )
              !
           END DO
           !

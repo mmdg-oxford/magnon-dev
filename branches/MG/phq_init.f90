@@ -45,14 +45,14 @@ SUBROUTINE phq_init()
   USE vlocal,               ONLY : strf
   USE spin_orb,             ONLY : lspinorb
   USE wvfct,                ONLY : igk, g2kin, npwx, npw, nbnd, ecutwfc
-  USE wavefunctions_module, ONLY : evc
+  USE wavefunctions_module, ONLY : evc, evc0
   USE noncollin_module,     ONLY : noncolin, npol
   USE uspp,                 ONLY : okvan, vkb
   USE uspp_param,           ONLY : upf
   USE eqv,                  ONLY : vlocq, evq, eprec
   USE phus,                 ONLY : becp1, alphap, dpqq, dpqq_so
   USE nlcc_ph,              ONLY : nlcc_any, drc
-  USE control_ph,           ONLY : trans, zue, epsil, lgamma, all_done, nbnd_occ
+  USE control_ph,           ONLY : trans, zue, epsil, lgamma, all_done, nbnd_occ, reduce_io
   USE units_ph,             ONLY : lrwfc, iuwfc
   USE qpoint,               ONLY : xq, igkq, npwq, nksq, eigqts, ikks, ikqs
 
@@ -165,7 +165,11 @@ SUBROUTINE phq_init()
      !
      ! ... read the wavefunctions at k
      !
+     IF(reduce_io)THEN
+     evc(:,:)=evc0(:,:,ikk)
+     ELSE
      CALL davcio( evc, lrwfc, iuwfc, ikk, -1 )
+     END IF
      !
      ! ... e) we compute the becp terms which are used in the rest of
      ! ...    the code
@@ -196,7 +200,11 @@ SUBROUTINE phq_init()
      !
      !
      ! this is the standard treatment
+        IF(reduce_io)THEN
+        evq(:,:)=evc0(:,:,ikq)
+        ELSE
         CALL davcio( evq, lrwfc, iuwfc, ikq, -1 )
+        END IF
      !
      ! diagonal elements of the unperturbed Hamiltonian,
      ! needed for preconditioning

@@ -21,7 +21,7 @@ SUBROUTINE openfilq()
   USE io_files,        ONLY : tmp_dir, diropn, seqopn
   USE control_ph,      ONLY : epsil, zue, ext_recover, trans, lgamma, &
                               tmp_dir_phq, start_irr, last_irr, xmldyn, &
-                              all_done
+                              all_done, reduce_io
   USE save_ph,         ONLY : tmp_dir_save
   USE ions_base,       ONLY : nat
   USE cell_base,       ONLY : at
@@ -69,10 +69,12 @@ SUBROUTINE openfilq()
 
   iuwfc = 20
   lrwfc = 2 * nbnd * npwx * npol
+IF(.not. reduce_io)THEN
   CALL diropn (iuwfc, 'wfc', lrwfc, exst)
   IF (.NOT.exst.and..not.all_done) THEN
      CALL errore ('openfilq', 'file '//trim(prefix)//'.wfc not found', 1)
   END IF
+END IF
   !
   ! From now on all files are written with the _ph prefix
   !
@@ -82,9 +84,12 @@ SUBROUTINE openfilq()
   !
   iubar = 21
   lrbar = 2 * nbnd * npwx * npol
+
+  IF(.not. reduce_io)THEN
   CALL diropn (iubar, 'bar', lrbar, exst)
   IF (ext_recover.AND..NOT.exst) &
      CALL errore ('openfilq','file '//trim(prefix)//'.bar not found', 1)
+  END IF
   !
   !    The file with the solution delta psi
   !
@@ -93,10 +98,11 @@ SUBROUTINE openfilq()
   iudwf = 29
   lrdwf = 2 * nbnd * npwx * npol
 
+  IF(.not. reduce_io)THEN
   CALL diropn (iudwf, 'dwf', lrdwf, exst)
   IF (ext_recover.AND..NOT.exst) &
      CALL errore ('openfilq','file '//trim(prefix)//'.dwf not found', 1)
-
+  END IF
 !  CALL diropn (iudwfp, 'dwfp', lrdwf, exst)
 !  IF (ext_recover.AND..NOT.exst) &
 !     CALL errore ('openfilq','file '//trim(prefix)//'.dwfp not found', 1)

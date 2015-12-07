@@ -109,7 +109,8 @@ MODULE eqv
   !
   ! ... The variable describing the linear response problem
   !
-  COMPLEX (DP), ALLOCATABLE :: dvpsi(:,:), dpsi(:,:), drhoscfs(:,:), dpsip(:,:), dpsim(:,:)
+  INTEGER :: ik_io      ! ik index for reduce_io= .true.
+  COMPLEX (DP), ALLOCATABLE :: dvpsi(:,:), dpsi(:,:), drhoscfs(:,:), dvpsi0(:,:,:), dpsi0(:,:,:)
   ! the product of dV psi
   ! the change of the wavefunctions
   REAL (DP), ALLOCATABLE :: dmuxc(:,:,:)        ! nrxx, nspin, nspin),

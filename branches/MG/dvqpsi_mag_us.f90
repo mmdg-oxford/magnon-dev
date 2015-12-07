@@ -183,7 +183,7 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
       do ip = 1, npol
         if (ip==1) then
            do ig = 1, npwq
-              dvpsi (ig, ibnd) = aux2 (nls (igkq (ig) ), 1)
+             dvpsi (ig, ibnd) = aux2 (nls (igkq (ig) ), 1)
            enddo
         else
            do ig = 1, npwq
