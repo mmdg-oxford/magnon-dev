@@ -346,11 +346,13 @@ END IF
              ! add the augmentation charge term for dvext and dbext
                call adddvscf (1, ik)
 
+            IF(niter_ph>1)then
                IF(reduce_io) THEN
                dvpsi0(:,:,ik)=dvpsi(:,:)
                ELSE
                call davcio (dvpsi, lrbar, iubar, nrec, 1)
                END IF
+            END IF
                
            endif
            !
@@ -428,12 +430,13 @@ END IF
 !          call davcio (dpsip, lrdwf, iudwfp, nrec, + 1)
 !          call davcio (epsim, lrdwf, iudwfm, nrec, + 1)
 !       if(qpol ==1) then
-
+IF(niter_ph>1)then          
            IF(reduce_io)THEN
            dpsi0(:,:,ik)=dpsi(:,:)
            ELSE
            call davcio (dpsi, lrdwf, iudwf, nrec, + 1)
            END IF
+END IF
            !
            ! calculates dvscf, sum over k => dvscf_q_ipert
            !

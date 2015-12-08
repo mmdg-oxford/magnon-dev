@@ -39,7 +39,7 @@ subroutine allocate_phq
   USE units_ph, ONLY : this_pcxpsi_is_on_file, this_dvkb3_is_on_file
   USE dynmat, ONLY : dyn00, dyn, dyn_rec, w2
   USE modes, ONLY : u, rtau, npert, name_rap_mode, num_rap_mode
-  USE control_ph, ONLY :  lgamma, reduce_io
+  USE control_ph, ONLY :  lgamma, reduce_io, niter_ph
 
 
   implicit none
@@ -63,15 +63,13 @@ subroutine allocate_phq
      allocate (igkq ( npwx))
   endif
   !
-  IF(reduce_io)then
+  IF(reduce_io .and. niter_ph>1)then
   allocate (dvpsi0 ( npwx*npol , nbnd, nksq))
   allocate (dpsi0 ( npwx*npol , nbnd, nksq))
-  allocate ( dpsi ( npwx*npol , nbnd))
-  allocate (dvpsi ( npwx*npol , nbnd))
-  ELSE
-  allocate (dvpsi ( npwx*npol , nbnd))
-  allocate ( dpsi ( npwx*npol , nbnd))
   END IF
+  allocate ( dpsi ( npwx*npol , nbnd))
+  allocate (dvpsi ( npwx*npol , nbnd))
+ 
  ! allocate ( dpsip ( npwx*npol , nbnd))
  ! allocate ( dpsim ( npwx*npol , nbnd))
   !
