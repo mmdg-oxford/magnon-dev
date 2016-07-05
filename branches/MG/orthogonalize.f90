@@ -7,7 +7,7 @@
 !
 !
 !-----------------------------------------------------------------------
-SUBROUTINE orthogonalize(dvpsi, evq, ikk, ikq, dpsi, npwq)
+SUBROUTINE orthogonalize(dvpsi, evq, ikk, ikq, dpsi, npwq, cw)
 !------------------------------------------------------------------------
   !
   ! This routine ortogonalizes dvpsi to the valence states: ps = <evq|dvpsi>
@@ -30,6 +30,7 @@ USE mp,          ONLY : mp_sum
 USE control_flags, ONLY : gamma_only
 USE realus,      ONLY : npw_k
 USE gvect,       ONLY : gstart
+USE ktetra,     ONLY : ltetra
 !
 IMPLICIT NONE
 INTEGER, INTENT(IN) :: ikk, ikq   ! the index of the k and k+q points
@@ -43,8 +44,10 @@ COMPLEX(DP), ALLOCATABLE :: ps(:,:)
 REAL(DP), ALLOCATABLE :: ps_r(:,:)
 
 INTEGER :: ibnd, jbnd, nbnd_eff
-REAL(DP) :: wg1, w0g, wgp, wwg, deltae, theta
+REAL(DP) :: wg1, w0g, wgp, deltae, theta
+COMPLEX(DP):: wwg
 REAL(DP), EXTERNAL :: w0gauss, wgauss
+COMPLEX(DP), INTENT(IN):: cw
 ! functions computing the delta and theta function
 
 CALL start_clock ('ortho')
@@ -83,6 +86,9 @@ if (lgauss) then
          deltae = et (jbnd, ikq) - et (ibnd, ikk)
          theta = wgauss (deltae / degauss, 0)
          wwg = wg1 * (1.d0 - theta) + wgp * theta
+!         wwg = wg1 * (1.d0 - theta) + wgp * theta * (1.d0 + 2.d0*CMPLX(0.d0,AIMAG(cw))/(deltae + CONJG(cw)))
+!Kun Cao: revised for TDDFPT
+          
 
 !KC: We do not need the projector alpha_pv here in the frequency dependent case
 ! where we could just simply add a tiny imaginary frequency to make the left
@@ -92,6 +98,7 @@ if (lgauss) then
          IF (jbnd <= nbnd_occ (ikq) ) THEN
             IF (abs (deltae) > 1.0d-5) THEN
                 wwg = wwg + alpha_pv * theta * (wgp - wg1) / deltae
+!                wwg = wwg + alpha_pv * theta * (wgp - wg1) / (deltae + cw )
             ELSE
                !
                !  if the two energies are too close takes the limit
@@ -119,6 +126,8 @@ ELSE
       CALL zgemm( 'C', 'N',nbnd_occ(ikq), nbnd_occ(ikk), npwx*npol, &
              (1.d0,0.d0), evq, npwx*npol, dvpsi, npwx*npol, &
              (0.d0,0.d0), ps, nbnd )
+
+   !ps= <evq|dvscf|psi>
    ELSEIF (gamma_only) THEN
             CALL dgemm( 'C', 'N', nbnd_occ(ikq), nbnd_occ (ikk), 2*npwq, &
              2.0_DP, evq, 2*npwx, dvpsi, 2*npwx, &
@@ -133,6 +142,7 @@ ELSE
              (0.d0,0.d0), ps, nbnd )
    END IF
    nbnd_eff=nbnd_occ(ikk)
+   IF(ltetra)nbnd_eff=nbnd_occ(ikq)
 END IF
 #ifdef __MPI
 IF (gamma_only) THEN
@@ -162,6 +172,27 @@ if (lgauss) then
              (1.d0,0.d0), dpsi, npwx, ps, nbnd, (-1.0d0,0.d0), &
               dvpsi, npwx )
    END IF
+
+
+ELSE IF(ltetra) THEN
+
+   IF (noncolin) THEN
+      CALL zgemm( 'N', 'N', npwx*npol, nbnd_occ(ikk), nbnd_occ(ikq), &
+                (1.d0,0.d0),dpsi,npwx*npol,ps,nbnd,(-1.0d0,0.d0), &
+                dvpsi, npwx*npol )
+   ELSEIF (gamma_only) THEN
+      ps = CMPLX (ps_r,0.0_DP, KIND=DP)
+      CALL ZGEMM( 'N', 'N', npwq, nbnd_occ(ikk), nbnd_occ(ikq), &
+               (1.d0,0.d0), dpsi, npwx, ps, nbnd, (-1.0d0,0.d0), &
+                dvpsi, npwx )
+   ELSE
+      CALL zgemm( 'N', 'N', npwq, nbnd_occ(ikk), nbnd_occ(ikq), &
+             (1.d0,0.d0), dpsi, npwx, ps, nbnd, (-1.0d0,0.d0), &
+              dvpsi, npwx )
+   END IF
+
+
+
 ELSE
    !
    !  Insulators: note that nbnd_occ(ikk)=nbnd_occ(ikq) in an insulator

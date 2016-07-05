@@ -288,7 +288,7 @@ subroutine phq_setup
   call mp_min( emin, inter_pool_comm )
 #endif
   if (lgauss) then
-     emax = target
+     emax = target ! + 0.03
      alpha_pv = emax - emin
   else
      emax = et (1, 1)
@@ -305,6 +305,7 @@ subroutine phq_setup
   endif
   ! avoid zero value for alpha_pv
   alpha_pv = max (alpha_pv, 1.0d-2)
+ ! alpha_pv = 0.d0
   !
   ! 7) set all the variables needed to use the pattern representation
   !
