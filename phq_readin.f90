@@ -318,7 +318,6 @@ SUBROUTINE phq_readin()
              TRIM(card)=='Qpoints') THEN
            READ (5, *, iostat = ios) num_k_pts
         ENDIF
-        print*, card
      ENDIF
      
      CALL mp_bcast(ios, ionode_id )

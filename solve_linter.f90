@@ -359,7 +359,8 @@ END IF
            ! Ortogonalize dvpsi to valence states: ps = <evq|dvpsi>
            ! Apply -P_c^+.
            !
-           CALL orthogonalize(dvpsi, evq, ikk, ikq, dpsi, npwq)
+           cw = fiu(iw)   
+           CALL orthogonalize(dvpsi, evq, ikk, ikq, dpsi, npwq, cw)
            !
            if (where_rec=='solve_lint'.or.iter > 1) then
               !
@@ -401,7 +402,7 @@ END IF
            !
            conv_root = .true.
            etc(:,:) = CMPLX( et(:,:), 0.0d0 , kind=DP)
-           cw = fiu(iw)
+!           cw = fiu(iw)
 
            if(real(cw).eq.0.d0.and.aimag(cw).eq.0.d0)then
 
