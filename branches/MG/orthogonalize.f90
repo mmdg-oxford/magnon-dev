@@ -96,16 +96,16 @@ if (lgauss) then
 
 
          IF (jbnd <= nbnd_occ (ikq) ) THEN
-            IF (abs (deltae) > 1.0d-5) THEN
-                wwg = wwg + alpha_pv * theta * (wgp - wg1) / deltae
-!                wwg = wwg + alpha_pv * theta * (wgp - wg1) / (deltae + cw )
-            ELSE
+!            IF (abs (deltae) > 1.0d-5) THEN
+!                wwg = wwg + alpha_pv * theta * (wgp - wg1) / deltae
+                wwg = wwg + alpha_pv * theta * (wgp - wg1) / (deltae + cw )
+!            ELSE
                !
                !  if the two energies are too close takes the limit
                !  of the 0/0 ratio
                !
-               wwg = wwg - alpha_pv * theta * w0g
-            ENDIF
+!               wwg = wwg - alpha_pv * theta * w0g
+!            ENDIF
          ENDIF
          !
          ps(jbnd,ibnd) = wwg * ps(jbnd,ibnd)
