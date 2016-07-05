@@ -288,7 +288,7 @@ subroutine phq_setup
   call mp_min( emin, inter_pool_comm )
 #endif
   if (lgauss) then
-     emax = target ! + 0.03
+     emax = target  + 0.04
      alpha_pv = emax - emin
   else
      emax = et (1, 1)
