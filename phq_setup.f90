@@ -305,7 +305,7 @@ subroutine phq_setup
   endif
   ! avoid zero value for alpha_pv
   alpha_pv = max (alpha_pv, 1.0d-2)
- ! alpha_pv = 0.d0
+  !alpha_pv = 0.d0
   !
   ! 7) set all the variables needed to use the pattern representation
   !
