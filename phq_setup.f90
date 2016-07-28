@@ -57,7 +57,6 @@ subroutine phq_setup
   USE ener,          ONLY : ef, ef_up, ef_dw
   USE klist,         ONLY : xk, lgauss, degauss, ngauss, nks, nelec, nelup, &
                             neldw, two_fermi_energies, wk
-  USE ktetra,        ONLY : ltetra, tetra
   USE lsda_mod,      ONLY : nspin, lsda, starting_magnetization, isk
   USE scf,           ONLY : v, vrs, vltot, rho, rho_core, kedtau
   USE fft_base,      ONLY : dfftp
@@ -93,6 +92,9 @@ subroutine phq_setup
   USE funct,         ONLY : dmxc, dmxc_spin, dmxc_nc, dft_is_gradient
   USE mp,            ONLY : mp_max, mp_min
   USE mp_global,     ONLY : inter_pool_comm, nimage
+  USE dfpt_tetra_mod, ONLY : dfpt_tetra_main
+  USE opt_tetra_mod, ONLY: tetra_type, opt_tetra_init
+  USE ktetra,        ONLY : ltetra, tetra, ntetra
   !
 
   implicit none
@@ -238,7 +240,7 @@ subroutine phq_setup
              ik,  (xk (ipol, ik) , ipol = 1, 3)
      enddo
   else if (ltetra) then
-     call errore('phq_setup','phonon + tetrahedra not implemented', 1)
+!     call errore('phq_setup','phonon + tetrahedra not implemented', 1)
   else
      if (noncolin) then
         nbnd_occ = nint (nelec)
@@ -290,6 +292,10 @@ subroutine phq_setup
   if (lgauss) then
      emax = target  + 0.04
      alpha_pv = emax - emin
+     !
+  ELSE IF(ltetra) then
+     !
+     CALL dfpt_tetra_main()
   else
      emax = et (1, 1)
      do ik = 1, nks

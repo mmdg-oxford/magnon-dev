@@ -63,6 +63,7 @@ SUBROUTINE phq_readin()
   USE ph_restart,    ONLY : ph_readfile
   USE xml_io_base,   ONLY : create_directory
   USE dfile_star,    ONLY : drho_star, dvscf_star
+  USE opt_tetra_mod, ONLY : tetra_type
   !
   IMPLICIT NONE
   !
@@ -98,7 +99,7 @@ SUBROUTINE phq_readin()
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
                        drho_star, dvscf_star, qpoints, dbext, do_elec, &
-                       dvext, transverse, symoff, man_kpoints
+                       dvext, transverse, symoff, man_kpoints, tetra_type
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -571,6 +572,13 @@ end if
   !
   IF (ldisp .AND. (nq1 .LE. 0 .OR. nq2 .LE. 0 .OR. nq3 .LE. 0)) &
        CALL errore('phq_readin','nq1, nq2, and nq3 must be greater than 0',1)
+
+    !
+!  IF (nspin /= 1 .and. elph_file /= 0) CALL errore ('phq_readin', &
+!  &  'Elphfile with lsda have not been available', 1)
+  !
+  IF (nspin == 2 .and. ltetra) CALL errore ('phq_readin', &
+  &  'Tetrahedron method with lsda have not been available', 1)
   !
   RETURN
   !

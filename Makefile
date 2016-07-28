@@ -16,6 +16,7 @@ addusldos.o \
 allocate_part.o \
 allocate_pert.o \
 allocate_phq.o \
+dfpt_tetra_mod.o \
 apply_dpot.o \
 bcast_ph_input.o \
 cch_psi_all.o \

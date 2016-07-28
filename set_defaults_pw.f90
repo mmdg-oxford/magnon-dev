@@ -51,6 +51,8 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   USE uspp_param,         ONLY : n_atom_wfc
   USE control_ph,         ONLY : man_kpoints, reduce_io
   USE wavefunctions_module, ONLY: evc0
+  USE opt_tetra_mod,      ONLY : tetra_type, opt_tetra_init
+  USE ktetra,             ONLY : ltetra, tetra, ntetra
   !
   IMPLICIT NONE
   !
@@ -189,6 +191,15 @@ SUBROUTINE setup_nscf ( newgrid, xq )
      kunit = 2
      !
   ENDIF
+
+    IF(ltetra .AND. (tetra_type /= 0)) THEN
+     ntetra = 6 * nk1 * nk2 * nk3
+     IF(ALLOCATED(tetra)) DEALLOCATE(tetra)
+     ALLOCATE( tetra( 20, ntetra ) )
+     CALL opt_tetra_init(nsymq, s, time_reversal .AND. minus_q, t_rev, at, bg, npk, k1, k2, k3, &
+     &                   nk1, nk2, nk3, nkstot, xk, tetra, kunit)
+    END IF
+
   !
   ! ... distribute k-points (and their weights and spin indices)
   !
