@@ -37,6 +37,7 @@ subroutine bcast_ph_input ( )
   USE io_global,   ONLY : ionode_id
   USE run_info,   ONLY : title
   USE dfile_star, ONLY : drho_star, dvscf_star
+  USE opt_tetra_mod, ONLY : tetra_type
 
   implicit none
   !
@@ -83,6 +84,7 @@ subroutine bcast_ph_input ( )
   CALL mp_bcast( k1, ionode_id )
   CALL mp_bcast( k2, ionode_id )
   CALL mp_bcast( k3, ionode_id )
+  CALL mp_bcast( tetra_type, ionode_id )
 
   !
   ! real*8

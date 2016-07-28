@@ -22,7 +22,7 @@ USE klist, ONLY : lgauss, degauss, ngauss
 USE noncollin_module, ONLY : noncolin, npol
 USE wvfct, ONLY : npwx, nbnd, et
 USE ener, ONLY : ef
-USE control_ph,  ONLY : alpha_pv, nbnd_occ
+USE control_ph,  ONLY : alpha_pv, nbnd_occ, lgamma
 USE becmod,      ONLY : bec_type, becp, calbec
 USE uspp,        ONLY : vkb, okvan
 USE mp_global,   ONLY : intra_pool_comm
@@ -31,6 +31,7 @@ USE control_flags, ONLY : gamma_only
 USE realus,      ONLY : npw_k
 USE gvect,       ONLY : gstart
 USE ktetra,     ONLY : ltetra
+USE dfpt_tetra_mod,   ONLY : dfpt_tetra_beta, dfpt_tetra_occ
 !
 IMPLICIT NONE
 INTEGER, INTENT(IN) :: ikk, ikq   ! the index of the k and k+q points
@@ -48,6 +49,7 @@ REAL(DP) :: wg1, w0g, wgp, deltae, theta
 COMPLEX(DP):: wwg
 REAL(DP), EXTERNAL :: w0gauss, wgauss
 COMPLEX(DP), INTENT(IN):: cw
+INTEGER :: ik
 ! functions computing the delta and theta function
 
 CALL start_clock ('ortho')
@@ -59,8 +61,49 @@ ENDIF
 ALLOCATE(ps(nbnd,nbnd))
 ps = (0.0_DP, 0.0_DP)
 
+IF (ltetra) then
+
+   IF (gamma_only) CALL errore ('orthogonalize', "degauss with gamma &
+   & point algorithms",1)
+   !
+   !  metallic case
+   !
+   IF (noncolin) THEN
+      CALL zgemm( 'C', 'N', nbnd, nbnd_occ (ikk), npwx*npol, (1.d0,0.d0), &
+      evq, npwx*npol, dvpsi, npwx*npol, (0.d0,0.d0), ps, nbnd )
+   ELSE
+      CALL zgemm( 'C', 'N', nbnd, nbnd_occ (ikk), npwq, (1.d0,0.d0), &
+      evq, npwx, dvpsi, npwx, (0.d0,0.d0), ps, nbnd )
+   END IF
+   !
+   IF (lgamma) THEN
+      ik = ikk
+   ELSE
+      ik = (ikk + 1) / 2
+   ENDIF
+   !
+   DO ibnd = 1, nbnd_occ (ikk)
+      !
+      wg1 = dfpt_tetra_occ(ibnd,ik)
+      !
+      DO jbnd = 1, nbnd
+         !
+         wwg = dfpt_tetra_beta(jbnd,ibnd,ik)
+         !
+         ps(jbnd,ibnd) = wwg * ps(jbnd,ibnd)
+         !
+      ENDDO
+      !
+      IF (noncolin) THEN
+         CALL dscal (2*npwx*npol, wg1, dvpsi(1,ibnd), 1)
+      ELSE
+         call dscal (2*npwq, wg1, dvpsi(1,ibnd), 1)
+      END IF
+   END DO
+   nbnd_eff=nbnd
+
 !
-if (lgauss) then
+else if (lgauss) then
    !
    IF (gamma_only) CALL errore ('orthogonalize', "degauss with gamma &
         & point algorithms",1)
@@ -98,7 +141,7 @@ if (lgauss) then
          IF (jbnd <= nbnd_occ (ikq) ) THEN
 !            IF (abs (deltae) > 1.0d-5) THEN
 !                wwg = wwg + alpha_pv * theta * (wgp - wg1) / deltae
-                wwg = wwg + alpha_pv * theta * (wgp - wg1) / (deltae + cw )
+                wwg = wwg + alpha_pv * theta * (wgp - wg1) / (deltae - cw )
 !            ELSE
                !
                !  if the two energies are too close takes the limit
@@ -142,7 +185,7 @@ ELSE
              (0.d0,0.d0), ps, nbnd )
    END IF
    nbnd_eff=nbnd_occ(ikk)
-   IF(ltetra)nbnd_eff=nbnd_occ(ikq)
+!   IF(ltetra)nbnd_eff=nbnd_occ(ikq)
 END IF
 #ifdef __MPI
 IF (gamma_only) THEN
@@ -159,7 +202,7 @@ CALL s_psi (npwx, npwq, nbnd_eff, evq, dpsi)
 !
 ! |dvspi> =  -(|dvpsi> - S|evq><evq|dvpsi>)
 !
-if (lgauss) then
+if (lgauss .or. ltetra) then
    !
    !  metallic case
    !
@@ -172,26 +215,6 @@ if (lgauss) then
              (1.d0,0.d0), dpsi, npwx, ps, nbnd, (-1.0d0,0.d0), &
               dvpsi, npwx )
    END IF
-
-
-ELSE IF(ltetra) THEN
-
-   IF (noncolin) THEN
-      CALL zgemm( 'N', 'N', npwx*npol, nbnd_occ(ikk), nbnd_occ(ikq), &
-                (1.d0,0.d0),dpsi,npwx*npol,ps,nbnd,(-1.0d0,0.d0), &
-                dvpsi, npwx*npol )
-   ELSEIF (gamma_only) THEN
-      ps = CMPLX (ps_r,0.0_DP, KIND=DP)
-      CALL ZGEMM( 'N', 'N', npwq, nbnd_occ(ikk), nbnd_occ(ikq), &
-               (1.d0,0.d0), dpsi, npwx, ps, nbnd, (-1.0d0,0.d0), &
-                dvpsi, npwx )
-   ELSE
-      CALL zgemm( 'N', 'N', npwq, nbnd_occ(ikk), nbnd_occ(ikq), &
-             (1.d0,0.d0), dpsi, npwx, ps, nbnd, (-1.0d0,0.d0), &
-              dvpsi, npwx )
-   END IF
-
-
 
 ELSE
    !

@@ -69,6 +69,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   USE mp,                   ONLY : mp_sum, mp_barrier
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
   USE fft_interfaces, ONLY: fwfft, invfft
+  USE ktetra,         ONLY: ltetra
   !
   implicit none
 
@@ -200,7 +201,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
   ! if q=0 for a metal: allocate and compute local DOS at Ef
   !
 
-  lmetq0 = lgauss.and.lgamma
+  lmetq0 = (lgauss .or. ltetra ).and.lgamma
 
   if (lmetq0) then
         allocate ( ldos ( dfftp%nnr  , nspin_mag) )

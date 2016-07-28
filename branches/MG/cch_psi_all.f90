@@ -79,13 +79,13 @@ SUBROUTINE cch_psi_all (n, h, ah, e, cw, ik, m)
   ah=(0.d0,0.d0)
   DO ibnd = 1, m
      DO ig = 1, n
-        ah (ig, ibnd) = hpsi (ig, ibnd) - (e(ibnd)-cw) * spsi (ig, ibnd)
+        ah (ig, ibnd) = hpsi (ig, ibnd) - (e(ibnd)+ cw) * spsi (ig, ibnd)
      ENDDO
   ENDDO
   IF (noncolin) THEN
      DO ibnd = 1, m
         DO ig = 1, n
-           ah (ig+npwx,ibnd)=hpsi(ig+npwx,ibnd)-(e(ibnd)-cw)*spsi(ig+npwx,ibnd)
+           ah (ig+npwx,ibnd)=hpsi(ig+npwx,ibnd)-(e(ibnd)+ cw)*spsi(ig+npwx,ibnd)
         ENDDO
      ENDDO
   ENDIF
