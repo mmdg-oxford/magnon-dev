@@ -49,7 +49,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
                                    nbnd_occ, alpha_mix, ldisp, rec_code_read, &
                                    where_rec, flmixdpot, ext_recover, do_elec, &
                                    transverse, dbext, lrpa, dvext, man_kpoints, &
-                                   symoff, reduce_io
+                                   symoff, reduce_io, thresh_CG
   USE nlcc_ph,              ONLY : nlcc_any
   USE units_ph,             ONLY : iudrho, lrdrho, iudwfp, iudwfm, lrdwf, iubar, lrbar, iudwf, &
                                    iuwfc, lrwfc, iunrec, iudvscf, &
@@ -95,8 +95,11 @@ SUBROUTINE solve_linter (drhoscf, iw)
   real(DP), external :: w0gauss, wgauss
   ! functions computing the delta and theta function
 
-
+!############# for test purpose ###############
 !  complex(DP), allocatable::dpsim(:,:),dpsip(:,:)
+!#####################################################################
+
+
   complex(DP), allocatable, target :: dvscfin(:,:)
   ! change of the scf potential
   complex(DP), pointer :: dvscfins (:,:)
@@ -125,7 +128,7 @@ SUBROUTINE solve_linter (drhoscf, iw)
              lter,       & ! counter on iterations of linear system
              ltaver,     & ! average counter
              lintercall, & ! average number of calls to cgsolve_all
-             ik, ikk,    & ! counter on k points
+             ik, ikk, jk, & ! counter on k points
              ikq,        & ! counter on k+q points
              ig,         & ! counter on G vectors
              ndim,       &
@@ -142,9 +145,9 @@ SUBROUTINE solve_linter (drhoscf, iw)
   complex(DP) :: cw
   integer::iw
   complex(DP), allocatable :: etc(:,:)
+  real(kind=DP) :: DZNRM2
 
-
-  external ch_psi_all, cg_psi, cch_psi_all
+  external ch_psi_all, cg_psi, cch_psi_all, DZNRM2
   !
   IF (rec_code_read > 20 ) RETURN
 
@@ -162,9 +165,11 @@ SUBROUTINE solve_linter (drhoscf, iw)
   else
      dvscfins => dvscfin
   endif
-!  allocate (dpsip(npwx*npol, nbnd))
-!  allocate (dpsim(npwx*npol, nbnd))
 
+!############## for test purpose ######################
+!  allocate (dpsip(dffts%nnr, nbnd))
+!  allocate (dpsim(dffts%nnr, nbnd))
+!################################################################
   
   allocate (drhoscfh ( dfftp%nnr, nspin_mag))
   allocate (dvscfout ( dfftp%nnr, nspin_mag ))
@@ -210,6 +215,40 @@ SUBROUTINE solve_linter (drhoscf, iw)
         call localdos ( ldos , ldoss , dos_ef )
   write(stdout, *)'dos_ef', dos_ef
   endif
+
+
+!################################# test the wavefunctions #######################
+
+!IF(reduce_io == .true.)THEN
+
+
+!Do ik=1, 2*nksq
+!  Do jk = ik+1, 2*nksq
+!  IF((xk (1,ik)+xk (1,jk))**2+ (xk (2,ik)+xk (2,jk))**2+ (xk (3,ik)+xk(3,jk))**2 < 1e-8)THEN
+!  WRITE( stdout,'(I8,3f10.6)' )ik, xk (1,ik), xk (2,ik), xk (3,ik)
+!  WRITE( stdout,'(I8,3f10.6)' )jk, xk (1,jk), xk (2,jk), xk (3,jk)
+!  cw = (0.d0, 0.d0)
+!   Do ibnd = 1, nbnd
+!   DZNRM2 (2*npwx, evc0(1, ibnd, ik)-evc0(1, ibnd, jk), 1)
+!   DZNRM2 (2*npwx, evc0(1, ibnd, ik)+evc0(1, ibnd, jk), 1)
+!   evc(:,ibnd)= evc0(1, ibnd, ik)-evc0(1, ibnd,jk)
+!   evq(:,ibnd)= evc0(1, ibnd, ik)+evc0(1, ibnd,jk)
+!   WRITE( stdout, '(2f12.8)')DZNRM2 (npol*npwx, evc(1, ibnd),1), DZNRM2 (npol*npwx,  evq(1, ibnd), 1)
+!   END DO
+!   WRITE( stdout, '(4f12.8)')DCONJG(evc0(nls(1), ibnd, ik))*evc0(nls(1), ibnd, ik),DCONJG(evc0(nls(1), ibnd, jk))*evc0(nls(1), ibnd, jk)
+!   END DO
+!  WRITE( stdout, '(6f12.8)')evc0(10, nbnd/2, jk), evc0(npwx/2, nbnd/2, jk), evc0(50, 5, jk)
+!  WRITE( stdout, '(a36,2I8,2f12.8)')'npwx, nbnd, evq(npwx/2, nbnd/2)',npwx, nbnd, &
+!  &  evc0(npwx/2, nbnd/2, ik)-evc0(npwx/2, nbnd/2, jk)
+!  END IF
+!  END DO
+!END DO
+
+
+!END IF
+! look at them in the real space
+
+!################################################################################
   !
   !
   ! In this case it has recovered after computing the contribution
@@ -241,10 +280,17 @@ SUBROUTINE solve_linter (drhoscf, iw)
 100        call errore ('solve_linter', 'reading igk', abs (ios) )
         endif
 
+
         if (lgamma)  npwq = npw
 
         ikk = ikks(ik)
         ikq = ikqs(ik)
+
+!############################## for test purpose ##########################
+
+!        WRITE(stdout, *) 'ikk, igk(10)', ikk, igk(10)
+
+!#####################################################################     
 
         if (lsda) current_spin = isk (ikk)
 
@@ -279,6 +325,7 @@ ELSE
 
         endif
 END IF
+
 
         !
         ! compute the kinetic energy
@@ -379,7 +426,8 @@ END IF
               !
               ! threshold for iterative solution of the linear system
               !
-              thresh = min (1.d-1 * sqrt (dr2), 1.d-2)
+              !thresh = min (1.d-1 * sqrt (dr2), 1.d-2)
+              thresh = thresh_CG
            else
               !
               !  At the first iteration dpsi and dvscfin are set to zero
@@ -393,8 +441,8 @@ END IF
               !
               ! starting threshold for iterative solution of the linear system
               !
-              thresh = 1.0d-2
-              if(niter_ph==1)thresh = 1.d-6 ! * sqrt (tr2_ph)
+              thresh = thresh_CG
+              if(niter_ph==1)thresh = thresh_CG ! * sqrt (tr2_ph)
            endif
 
            !
@@ -491,21 +539,16 @@ END IF
      !
      !   Reduce the delta rho across pools
      !
-!     call mp_sum ( drhoscf, inter_pool_comm )
      call mp_sum ( drhoscfh, inter_pool_comm )
 
      if(my_image_id/=0)then
-!     drhoscf =  CONJG(drhoscf)
      drhoscfh =  CONJG(drhoscfh)
      end if
 
-!     call mp_barrier(inter_image_comm)
-!     call mp_synchronize(inter_image_comm)
-!     call mp_sum(drhoscf, inter_image_comm)
+
      call mp_sum(drhoscfh, inter_image_comm)
 
      if(my_image_id/=0)then
-!     drhoscf =  CONJG(drhoscf)
      drhoscfh =  CONJG(drhoscfh)
      end if
 
@@ -526,22 +569,29 @@ END IF
      !
   IF((.not. man_kpoints) .and. (.not. symoff)) then 
      IF (.not.lgamma_gamma) THEN
-#ifdef __MPI
-        call psymdvscf (1, 1, drhoscfh)
-        IF ( noncolin.and.domag ) &
-        CALL psym_dmag( 1, 1, drhoscfh)
-#else
-        call symdvscf (1, 1, drhoscfh)
-        IF ( noncolin.and.domag ) CALL sym_dmag( 1, 1, drhoscfh)
+!#ifdef __MPI
+!        call psymdvscf (1, 1, drhoscfh)
+!        IF ( noncolin.and.domag ) &
+!        CALL psym_dmag( 1, 1, drhoscfh)
+!#else
+!        call symdvscf (1, 1, drhoscfh)
+!        IF ( noncolin.and.domag ) CALL sym_dmag( 1, 1, drhoscfh)
 !        call psym_dmage(dvtosym)
 !        call sym_dmage(dvtosym)
-#endif
+!#endif
 !        IF (okpaw) THEN
 !           IF (minus_q) CALL PAW_dumqsymmetrize(dbecsum,npe,irr, &
 !                             npertx,irotmq,rtau,xq,tmq)
 !           CALL  &
 !              PAW_dusymmetrize(dbecsum,npe,irr,npertx,nsymq,rtau,xq,t)
 !        END IF
+!#ifdef __MPI
+!        call psymb (drhoscfh)
+!        IF ( noncolin.and.domag ) CALL psym_dmagb(drhoscfh)
+!#else
+        call symb (drhoscfh)
+        IF ( noncolin.and.domag ) CALL sym_dmagb(drhoscfh)
+!#endif
      ENDIF
   END IF
      !
@@ -567,7 +617,7 @@ END IF
       IF(niter_ph==1)alpha_mix=1.d0
       
       if(transverse .and. .not. do_elec)then
-      call mix_potential_c(dfftp%nnr*2, dvscfout(1,2), dvscfin(1,2), &
+      call mix_potential_c(dfftp%nnr*3, dvscfout(1,2), dvscfin(1,2), &
                              alpha_mix(kter), dr2, tr2_ph/npol, iter, &
                              nmix_ph, convt)
       else
@@ -636,7 +686,7 @@ END IF
 
 
      ! check that convergent have been reached on ALL processors in this image
-     ! CALL check_all_convt(convt)
+      CALL check_all_convt(convt)
 
      if (doublegrid) then
          do is = 1, nspin_mag
@@ -650,9 +700,9 @@ END IF
      aux_avg (1) = DBLE (ltaver)
      aux_avg (2) = DBLE (lintercall)
      call mp_sum ( aux_avg, inter_pool_comm )
-     averlt = aux_avg (1) / aux_avg (2)
+     averlt = aux_avg (1)  / aux_avg (2)
 #else
-     averlt = DBLE (ltaver) / lintercall
+     averlt = DBLE (ltaver)  / lintercall
 #endif
      tcpu = get_clock ('PHONON')
 
@@ -683,19 +733,39 @@ END IF
 
 
      if(noncolin)then 
+
+!#################################  for test purpose ########################
+
+write(stdout,'(5x," q,freq,drho in real space, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (dffts%nnr/2,ig)), ig = 1,4), &
+                                                          (aimag(drhoscf(dffts%nnr/2,ig)),ig = 1,4)
+
+!####################################################################
+
+
          do ig=1, nspin_mag
            CALL fwfft ('Smooth', drhoscf(:,ig), dffts)
          enddo
           
+!         write(stdout,'(5x, "g(1), g(2), g(10) ",9f12.5)') g(1, 1), g(2, 1), g(3,1), g(1, 2), g(2, 2), g(3,2), g(1, 10), g(2, 10), g(3,10)
          write(stdout,'(5x," q,freq,drho, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (nls(1),ig)), ig = 1,4), &
                                                           (aimag(drhoscf(nls(1),ig)), ig = 1,4)
-         if(convt) write(stdout,'(5x," q,freq,convtdrho, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (nls(1),ig)), ig = 1,4), &
+         
+
+!################################# for test purpose ##################################
+!write(stdout,'(5x," q,freq,drho, "5f10.5,"  ",8f10.4)') xq(:),fiu(iw)*13.6057, (real(drhoscf (nls(2),ig)), ig = 1,4), &
+!                                                          (aimag(drhoscf(nls(2),ig)), ig = 1,4)
+!write(stdout,'(5x," q,freq,drho, "5f10.5,"  ",8f10.4)') xq(:),fiu(iw)*13.6057, (real(drhoscf (nls(10),ig)), ig = 1,4), &
+!                                                          (aimag(drhoscf(nls(10),ig)),ig = 1,4)
+!#######################################################################################
+
+
+        If(convt) write(stdout,'(5x," q,freq,convtdrho, "5f10.5,"  ",8f10.4)') xq(:), fiu(iw)*13.6057, (real(drhoscf (nls(1),ig)), ig = 1,4), &
                                                           (aimag(drhoscf(nls(1),ig)),ig = 1,4)
 
         if(transverse) then
         WRITE(stdout, '(5x,"transverse magnetic response" )')
         if(convt)then
-          write(stdout,'(5x,"freq, convtchiq+-, "f12.5,"  ",4f14.7)') real(fiu(iw))*13605.7, &
+          write(stdout,'(5x,"convtchiq+-", 3f10.4, f12.5,"  ",4f14.7)') xq(:), real(fiu(iw))*13605.7, &
           real((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
           aimag((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0),&
           real((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
@@ -710,8 +780,22 @@ END IF
         end if
      end if
 
-     if(do_elec) then
+
+!######################## for test purpose  ################################
+
+!      IF(do_elec) then
+!          write(stdout,'(5x," real space q,freq,drho, "5f10.5,"  ",4f10.6)') xq(:), fiu(iw)*13.6057, drhoscf (dffts%nnr/2,1), drhoscf (dffts%nnr/4,1)
+
+!          CALL fwfft ('Smooth', drhoscf(:,1), dffts)
+
+!          write(stdout,'(5x," PW space q,freq,drho, "5f10.5,"  ",6f10.6)') xq(:), fiu(iw)*13.6057, drhoscf (nls(1),1), drhoscf (nls(2),1), drhoscf (nls(3),1)
+
+!      END IF
+
+!#################################################################
 !         do ig=1, nspin_mag
+
+     if(do_elec) then
            IF(nspin_mag==2)then
            drhoscf(:,1) = (dvscfins(:,1)+dvscfins(:,2))/2
            ELSE

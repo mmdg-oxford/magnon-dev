@@ -18,9 +18,9 @@ SUBROUTINE orthogonalize(dvpsi, evq, ikk, ikq, dpsi, npwq, cw)
   ! NB: IN/OUT is dvpsi ; dpsi is used as work_space
   !
 USE kinds, ONLY : DP
-USE klist, ONLY : lgauss, degauss, ngauss
+USE klist, ONLY : lgauss, degauss, ngauss, wk
 USE noncollin_module, ONLY : noncolin, npol
-USE wvfct, ONLY : npwx, nbnd, et
+USE wvfct, ONLY : npwx, nbnd, et, wg
 USE ener, ONLY : ef
 USE control_ph,  ONLY : alpha_pv, nbnd_occ, lgamma
 USE becmod,      ONLY : bec_type, becp, calbec
@@ -31,7 +31,7 @@ USE control_flags, ONLY : gamma_only
 USE realus,      ONLY : npw_k
 USE gvect,       ONLY : gstart
 USE ktetra,     ONLY : ltetra
-USE dfpt_tetra_mod,   ONLY : dfpt_tetra_beta, dfpt_tetra_occ
+USE dfpt_tetra_mod,   ONLY : dfpt_tetra_beta
 !
 IMPLICIT NONE
 INTEGER, INTENT(IN) :: ikk, ikq   ! the index of the k and k+q points
@@ -76,19 +76,19 @@ IF (ltetra) then
       evq, npwx, dvpsi, npwx, (0.d0,0.d0), ps, nbnd )
    END IF
    !
-   IF (lgamma) THEN
-      ik = ikk
-   ELSE
-      ik = (ikk + 1) / 2
-   ENDIF
+!   IF (lgamma) THEN
+!      ik = ikk
+!   ELSE
+!      ik = (ikk + 1) / 2
+!   ENDIF
    !
    DO ibnd = 1, nbnd_occ (ikk)
       !
-      wg1 = dfpt_tetra_occ(ibnd,ik)
+      wg1 = wg(ibnd,ikk) / wk(ikk)
       !
       DO jbnd = 1, nbnd
          !
-         wwg = dfpt_tetra_beta(jbnd,ibnd,ik)
+         wwg = dfpt_tetra_beta(jbnd,ibnd,ikk)
          !
          ps(jbnd,ibnd) = wwg * ps(jbnd,ibnd)
          !

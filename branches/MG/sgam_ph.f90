@@ -118,7 +118,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !  local variables
   !
 
-  real(DP) :: aq (3), raq (3), zero (3), aBext(3), raBext(3)
+  real(DP) :: aq (3), raq (3), zero (3), aBext(3), raBext(3), bplus(3),bminus(3)
   ! q vector in crystal basis
   ! the rotated of the q vector
   ! the zero vector
@@ -150,7 +150,7 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   call cryst_to_cart (1, aq, at, -1)
   call cryst_to_cart (1, abext, at, -1)
   !KC: for test 
-  write(stdout,'("aq, abext",6f10.5)')aq, abext
+  write(stdout,'("5x, aq, abext in crystal basis", 6f10.5)')aq, abext
   !
   !   Test all symmetries to see if this operation send Sq in q+G or in -q+G
   !
@@ -170,14 +170,18 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
         enddo
      enddo
      sym (irot) = eqvect (raq, aq, zero, accep)
-    if (sname(irot)(1:3)=='inv') rabext=-rabext
-    if (t_rev(irot)==1) rabext=-rabext
+!    if (sname(irot)(1:3)=='inv') rabext=-rabext
+!    if (t_rev(irot)==1) rabext=-rabext
      
-     if(.not. do_elec) then
+!     if(.not. do_elec) then
        do ipol=1, 3
-          sym(irot)=sym(irot) .and. (abs(rabext(ipol)-abext(ipol))<1.0d-5)  
+          sym(irot)=sym(irot) .and. (abs(raq(ipol)-aq(ipol))<1.0d-5)
        end do
-     end if 
+   
+!         bplus(:)= rabext(:)+abext(:)
+!         bminus(:) = rabext(:)-abext(:)
+!         sym(irot) = sym(irot) .and. (norm2(bplus)< 1.0d-5 .or. norm2(bminus)< 1.0d-5)
+!     end if 
      !
      !  if "iswitch.le.-3" (modenum.ne.0) S must be such that Sq=q exactly !
      !
@@ -187,17 +191,17 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
  !       enddo
  !    endif
 !     if (.not.minus_q) then
-     if (sym(irot).and..not.minus_q) then
-        raq = - raq
-        minus_q = eqvect (raq, aq, zero, accep)
-     endif
+!     if (sym(irot).and..not.minus_q) then
+!        raq = - raq
+!        minus_q = eqvect (raq, aq, zero, accep)
+!     endif
 100  continue
   enddo
 
   !
   !  if "iswitch.le.-3" (modenum.ne.0) time reversal symmetry is not included !
   !
-  if (modenum.ne.0) minus_q = .false.
+!  if (modenum.ne.0) minus_q = .false.
 !     minus_q = .false.
   !
   return

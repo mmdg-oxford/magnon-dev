@@ -49,7 +49,7 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   USE paw_variables,      ONLY : okpaw
   USE modes,              ONLY : nsymq, invsymq, minus_q
   USE uspp_param,         ONLY : n_atom_wfc
-  USE control_ph,         ONLY : man_kpoints, reduce_io
+  USE control_ph,         ONLY : symoff, man_kpoints, reduce_io
   USE wavefunctions_module, ONLY: evc0
   USE opt_tetra_mod,      ONLY : tetra_type, opt_tetra_init
   USE ktetra,             ONLY : ltetra, tetra, ntetra
@@ -82,6 +82,22 @@ SUBROUTINE setup_nscf ( newgrid, xq )
 #else
   use_para_diag = .FALSE.
 #endif
+
+IF(man_kpoints .or. symoff) THEN
+
+  time_reversal = .false.
+  magnetic_sym  = .true.
+  nsymq = 1
+  minus_q = .false.
+  invsymq = .false.
+  nrot = 1
+  write(stdout,*)'nsymq, nsym, minus_q',nsymq,nsym, minus_q
+  t_rev = 0
+  nsym = 1
+
+ELSE
+
+
   !
   ! ... Symmetry and k-point section
   !
@@ -100,6 +116,8 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   nsym=nsymq
  
   invsym = invsymq
+
+END IF
 
   !CALL mp_bcast (nsymq, root, world_comm)
   !
@@ -141,6 +159,31 @@ SUBROUTINE setup_nscf ( newgrid, xq )
   ! ... add k+q to the list of k
   !
      CALL set_kplusq( xk, wk, xq, nkstot, npk )
+
+
+  IF ( ABS( xq(1) ) < eps8 .AND. ABS( xq(2) ) < eps8 .AND. &
+       ABS( xq(3) ) < eps8 ) THEN
+     !
+     kunit = 1
+     !
+  ELSE
+     !
+     kunit = 2
+     !
+  ENDIF
+
+    IF(ltetra .AND. (tetra_type /= 0)) THEN
+     ntetra = 6 * nk1 * nk2 * nk3
+     IF(ALLOCATED(tetra)) DEALLOCATE(tetra)
+     ALLOCATE( tetra( 20, ntetra ) )
+     CALL opt_tetra_init(nsymq, s, time_reversal .AND. minus_q, t_rev, at, bg, npk, k1, k2, k3, &
+     &                   nk1, nk2, nk3, nkstot, xk, tetra, kunit)
+    END IF
+
+
+
+
+
   !
   IF ( lsda ) THEN
      !
@@ -180,25 +223,7 @@ SUBROUTINE setup_nscf ( newgrid, xq )
 #ifdef __MPI
   !
   ! ... set the granularity for k-point distribution
-  !
-  IF ( ABS( xq(1) ) < eps8 .AND. ABS( xq(2) ) < eps8 .AND. &
-       ABS( xq(3) ) < eps8 ) THEN
-     !
-     kunit = 1
-     !
-  ELSE
-     !
-     kunit = 2
-     !
-  ENDIF
 
-    IF(ltetra .AND. (tetra_type /= 0)) THEN
-     ntetra = 6 * nk1 * nk2 * nk3
-     IF(ALLOCATED(tetra)) DEALLOCATE(tetra)
-     ALLOCATE( tetra( 20, ntetra ) )
-     CALL opt_tetra_init(nsymq, s, time_reversal .AND. minus_q, t_rev, at, bg, npk, k1, k2, k3, &
-     &                   nk1, nk2, nk3, nkstot, xk, tetra, kunit)
-    END IF
 
   !
   ! ... distribute k-points (and their weights and spin indices)

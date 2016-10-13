@@ -55,7 +55,7 @@ real(DP) :: &
 
 !HL upping iterations to get convergence with green_linsys?
 
-  integer, parameter :: maxiter = 500
+  integer, parameter :: maxiter = 200
   !integer, parameter :: maxter = 600
   !the maximum number of iterations
   integer :: iter, ibnd, lbnd, itol

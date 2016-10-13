@@ -21,7 +21,7 @@ subroutine sym_dmage (dvsym)
   USE lsda_mod, only : nspin
   implicit none
 
-  complex(DP) :: dvsym (dfftp%nr1x, dfftp%nr2x, dfftp%nr3x, nspin, 3)
+  complex(DP) :: dvsym (dfftp%nr1x, dfftp%nr2x, dfftp%nr3x, nspin)
   complex(DP), allocatable ::  aux (:,:,:,:,:)
   complex(DP) ::  dmags(3,3), mag(3), magrot(3)
   ! the potential to symmetrize

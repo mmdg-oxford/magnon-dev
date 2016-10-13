@@ -68,7 +68,7 @@ subroutine phq_setup
   USE spin_orb,      ONLY : domag
   USE constants,     ONLY : degspin, pi
   USE noncollin_module, ONLY : noncolin, m_loc, angle1, angle2, ux, nspin_mag
-  USE wvfct,         ONLY : nbnd, et
+  USE wvfct,         ONLY : nbnd, et, wg
   USE nlcc_ph,       ONLY : drc, nlcc_any
   USE eqv,           ONLY : dmuxc
   USE control_ph,    ONLY : rec_code, lgamma_gamma, search_sym, start_irr, &
@@ -241,7 +241,16 @@ subroutine phq_setup
      enddo
   else if (ltetra) then
 !     call errore('phq_setup','phonon + tetrahedra not implemented', 1)
-  else
+
+   do ik = 1, nks
+     nbnd_occ(ik) = 0
+     do ibnd = 1, nbnd
+       IF(wg(ibnd,ik) > 1d-8) nbnd_occ(ik) = ibnd
+     END DO
+   END DO
+
+
+ else
      if (noncolin) then
         nbnd_occ = nint (nelec)
      else
@@ -310,8 +319,8 @@ subroutine phq_setup
      alpha_pv = 2.d0 * (emax - emin)
   endif
   ! avoid zero value for alpha_pv
-  alpha_pv = max (alpha_pv, 1.0d-2)
-  !alpha_pv = 0.d0
+if (.not. ltetra) alpha_pv = max (alpha_pv, 1.0d-2)
+ ! alpha_pv = 0.d0
   !
   ! 7) set all the variables needed to use the pattern representation
   !
@@ -345,20 +354,20 @@ subroutine phq_setup
   ! allocate and calculate rtau, the bravais lattice vector associated
   ! to a rotation
   !
-  call sgam_ph_new (at, bg, nsym, s, irt, tau, rtau, nat)
+ ! call sgam_ph_new (at, bg, nsym, s, irt, tau, rtau, nat)
   !
   !    and calculate the vectors G associated to the symmetry Sq = q + G
   !    if minus_q is true calculate also irotmq and the G associated to Sq=-g+G
   !
-  CALL set_giq (xq,s,nsymq,nsym,irotmq,minus_q,gi,gimq)
-  is_symmorphic=.NOT.(ANY(ftau(:,1:nsymq) /= 0))
-  IF (.NOT.is_symmorphic) THEN
-     DO isym=1,nsymq
-        search_sym=( search_sym.and.(abs(gi(1,isym))<1.d-8).and.  &
-                                    (abs(gi(2,isym))<1.d-8).and.  &
-                                    (abs(gi(3,isym))<1.d-8) )
-     END DO
-  ENDIF
+ ! CALL set_giq (xq,s,nsymq,nsym,irotmq,minus_q,gi,gimq)
+ ! is_symmorphic=.NOT.(ANY(ftau(:,1:nsymq) /= 0))
+ !" IF (.NOT.is_symmorphic) THEN
+ !    DO isym=1,nsymq
+ !       search_sym=( search_sym.and.(abs(gi(1,isym))<1.d-8).and.  &
+ !                                   (abs(gi(2,isym))<1.d-8).and.  &
+ !                                   (abs(gi(3,isym))<1.d-8) )
+ !    END DO
+ ! ENDIF
   num_rap_mode=-1
   IF (search_sym) CALL prepare_sym_analysis(nsymq,sr,t_rev,magnetic_sym)
   if (fildrho.ne.' '.and.ionode) call io_pattern (nat,fildrho,nirr,npert,u,xq,tmp_dir,+1)
