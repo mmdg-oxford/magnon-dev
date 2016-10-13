@@ -22,7 +22,7 @@ subroutine bcast_ph_input ( )
                          ldisp, reduce_io, zue, zeu, epsil, trans, &
                          lgamma, ldiag, lqdir, search_sym,  electron_phonon,&
                          do_elec, dbext, dvext, transverse, symoff, qpoints,&
-                         man_kpoints
+                         man_kpoints, thresh_CG
   USE gamma_gamma, ONLY : asr
 !  USE qpoint, ONLY: dbext
   USE disp, ONLY : nq1, nq2, nq3, kpoints, xk_kpoints
@@ -96,6 +96,7 @@ subroutine bcast_ph_input ( )
   !
   call mp_bcast (dbext, ionode_id )
   call mp_bcast (dvext, ionode_id )
+  call mp_bcast (thresh_CG, ionode_id )
   !
   ! characters
   !

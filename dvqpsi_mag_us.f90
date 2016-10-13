@@ -25,12 +25,13 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
   USE lsda_mod,  ONLY : lsda, isk
   USE noncollin_module, ONLY : npol, noncolin
   use uspp_param,ONLY : upf
-  USE wvfct,     ONLY : nbnd, npw, npwx, igk
+  USE wvfct,     ONLY : nbnd, npw, npwx, igk, et
   USE wavefunctions_module,  ONLY: evc
   USE nlcc_ph,    ONLY : nlcc_any, drc
   USE eqv,        ONLY : dvpsi, dmuxc, vlocq
   USE qpoint,     ONLY : npwq, igkq, xq, eigqts, ikks
   USE control_ph, ONLY : do_elec,dbext, dvext
+  USE io_global,            ONLY : stdout
 
   implicit none
   !
@@ -127,6 +128,23 @@ subroutine dvqpsi_mag_us (ik, addnlcc)
        CALL invfft ('Wave', psic(:,2), dffts)
        end if
      end do
+
+!###################### for test purpose ##################
+
+!   WRITE(stdout, *)'ikk', ikk, et(ibnd,ikk)
+!   DO ip=1,npol
+!      IF(ip==1)then
+!      write(stdout, '(4f15.8)') DCONJG(psic(dffts%nnr/2,1))*psic(dffts%nnr/2,1), DCONJG(psic(dffts%nnr/4,1))*psic(dffts%nnr/4,1)
+!       write(stdout, '(4f15.8)') psic(dffts%nnr/2,1), psic(dffts%nnr/4,1)
+!      ELSE
+!      write(stdout, '(4f15.8)') DCONJG(psic(dffts%nnr/2,2))*psic(dffts%nnr/2,2), DCONJG(psic(dffts%nnr/4,2))*psic(dffts%nnr/4,2)
+!      write(stdout, '(4f15.8)') psic(dffts%nnr/2,2), psic(dffts%nnr/4,2)
+!      END IF
+!   END DO
+
+!###########################################################
+
+
 
 !For electric field perturbation couples directly to wave functions.
    if(do_elec) then

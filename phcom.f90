@@ -296,7 +296,8 @@ MODULE control_ph
              last_irr,      & ! last representation of this run
              current_iq,    & ! current q point
              start_q, last_q  ! initial q in the list, last_q in the list
-  REAL(DP) :: tr2_ph  ! threshold for phonon calculation
+  REAL(DP) :: tr2_ph, &  ! threshold for phonon calculation
+              thresh_CG          ! threshhold for the CG solver
   COMPLEX (DP) :: dbext(3), dvext            
   REAL(DP) :: alpha_mix(maxter), & ! the mixing parameter
               time_now,          & ! CPU time up to now
@@ -343,7 +344,6 @@ MODULE control_ph
              symoff, &        ! if true turn off the symmetry, i.e. set nsym=1
              man_kpoints, &   ! manual input of all kpoints
              qpoints         ! qpoints card in the input file
-            
   !
 END MODULE control_ph
 !

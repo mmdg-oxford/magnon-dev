@@ -41,7 +41,7 @@ SUBROUTINE phq_readin()
                             last_irr, start_q, last_q, current_iq, tmp_dir_ph, &
                             ext_recover, ext_restart, u_from_file, ldiag, &
                             search_sym, lqdir, electron_phonon, do_elec, dbext, qplot, dvext, &
-                            transverse, symoff, man_kpoints, qpoints
+                            transverse, symoff, man_kpoints, qpoints, thresh_CG
   USE save_ph,       ONLY : tmp_dir_save
   USE gamma_gamma,   ONLY : asr
   USE qpoint,        ONLY : nksq, xq
@@ -99,7 +99,7 @@ SUBROUTINE phq_readin()
                        start_q, last_q, nogg, ldiag, search_sym, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
                        drho_star, dvscf_star, qpoints, dbext, do_elec, &
-                       dvext, transverse, symoff, man_kpoints, tetra_type
+                       dvext, transverse, symoff, man_kpoints, tetra_type, thresh_CG
 
   ! tr2_ph       : convergence threshold
   ! amass        : atomic masses
@@ -233,11 +233,13 @@ SUBROUTINE phq_readin()
 !
   do_elec = .FALSE.
   transverse = .False.
-  symoff = .false.
+  symoff = .TRUE.
   qplot = .false.
  ! okvan=.TRUE.
   qpoints = .TRUE.
   man_kpoints = .FALSE.
+  thresh_CG = 1.d-1
+  tetra_type = 1 
   !
   drho_star%open = .FALSE.
   drho_star%basis = 'modes'

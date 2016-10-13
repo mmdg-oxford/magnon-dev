@@ -14,38 +14,14 @@ MODULE dfpt_tetra_mod
   IMPLICIT NONE
   !
   PRIVATE
-  PUBLIC dfpt_tetra_beta, dfpt_tetra_dbl, dfpt_tetra_occ, dfpt_tetra_dlta, &
-  &      dfpt_tetra_main
+  PUBLIC dfpt_tetra_beta, dfpt_tetra_ttheta, dfpt_tetra_delta, dfpt_tetra_main, dfpt_tetra_linit
+  !
+  LOGICAL,SAVE :: dfpt_tetra_linit = .FALSE.
   !
   REAL(dp),ALLOCATABLE,SAVE :: &
-  & dfpt_tetra_beta(:,:,:), & ! (nbnd, nbnd, nksq)
-  & dfpt_tetra_dbl(:,:,:), & ! (nbnd, nbnd, nksq) Double occupancy
-  & dfpt_tetra_occ(:,:), & ! (nbnd, nksq) Occupation
-  & dfpt_tetra_dlta(:,:) ! (nbnd, nksq) delta(e_F - e_k)
-  !
-  INTEGER,SAVE :: &
-  & sttk, & ! the first k in this Prosess Element
-  & lstk, & ! the last k in this PE
-  & nkBZ, & ! nk1 * nk2 * nk3
-  & ivvec(3,20,6), & ! 
-  & nsymqbz, & ! # of q-conserving symmetries of BZ; 
-  & nsymbz ! # of symmetries of BZ
-  !
-  REAL(dp),SAVE :: &
-  & wlsm(4,20)
-  !
-  INTEGER,ALLOCATABLE,SAVE :: &
-  & grid(:,:), &   ! (3,nkBZ)
-  & indx(:,:,:), & ! (nk1,nk2,nk3)
-  & symq(:,:,:), & ! (3,3,nsymqbz)
-  & sym(:,:,:)     ! (3,3,nsymbz)
-  !
-  REAL(dp),ALLOCATABLE,SAVE :: &
-  & eig1(:,:), & ! (nbnd,nkBZ) eig(k)
-  & eig2(:,:), & ! (nbnd,nkBZ) eig(k+q)
-  & occ(:,:),  & ! (nbnd,nkBZ) occupations
-  & dfde(:,:), & ! (nbnd,nkBZ) df / de
-  & beta(:,:,:)  ! (nbnd,nbnd,nkBZ) 
+  & dfpt_tetra_beta(:,:,:), & ! (nbnd, nbnd, nksq) beta(e_k, e_k+q)
+  & dfpt_tetra_ttheta(:,:,:), & ! (nbnd, nbnd, nksq) t(ef-e_k)t(e_k - e_k+q)+ t(ef-e_k+q)t(e_k+q - e_k) 
+  & dfpt_tetra_delta(:,:) ! (nbnd, nksq) delta(e_F - e_k)
   !
 CONTAINS
 !
@@ -57,613 +33,302 @@ SUBROUTINE dfpt_tetra_main()
   ! in PRB 64, 235118 (2001).
   !
   USE kinds,      ONLY : dp
-  USE mp,         ONLY : mp_sum, mp_max
-  USE mp_global,   ONLY : mpime, nproc, world_comm
+  USE mp,         ONLY : mp_sum
+  USE mp_global,  ONLY : me_image, nproc_image, intra_image_comm
   USE io_global,  ONLY : stdout
-  USE symm_base,  ONLY : s, nsym, invsym
-  USE wvfct,      ONLY : nbnd, wg
-  USE klist,      ONLY : xk, wk, nks
-  USE cell_base,  ONLY : at
+  USE wvfct,      ONLY : nbnd, et
+  USE ktetra,     ONLY : ntetra
+  USE klist,      ONLY : wk, nks, nkstot
   USE qpoint,     ONLY : nksq, xq
   USE control_ph, ONLY : lgamma, alpha_pv, nbnd_occ
-  USE modes, ONLY : nsymq, minus_q
-  USE start_k,    ONLY : nk1, nk2, nk3
+  USE ener,       ONLY : ef
+  USE cell_base, ONLY : at
+  USE lsda_mod,   ONLY : nspin
   !
   IMPLICIT NONE
   !
-  INTEGER :: nkpp, rest, ikv2(3), ik, ik2, ikk, ikq, ib, isym, nksym
-  REAL(dp) :: kv1(3), kv2(3)
+  INTEGER :: ntpp, rest, ik, ibnd
+  INTEGER :: &
+  & tfst, & ! the first tetrahedron in this Prosess Element
+  & tlst, & ! the last tetrahedron in this PE
+  & iq      ! = 0 for q = Gamma, = 1 for other
   !
-  ! Symmetries of BZ of this crystal
+  REAL(dp) :: qvec(3)
   !
-  nsymbz = nsym
-  IF(.NOT. invsym) nsymbz = nsym * 2
+  REAL(dp),ALLOCATABLE :: &
+  & delta(:,:), & ! (nbnd,nkstot) df / de
+  & beta(:,:,:)  ! (nbnd,nbnd,nkstot) 
   !
-  ALLOCATE(sym(3,3,nsymbz))
+  ALLOCATE(delta(nbnd,nkstot), beta(nbnd,nbnd,nkstot))
+  CALL poolcollect(et, nbnd, nkstot, nks)
   !
-  sym(1:3,1:3,1:nsym) = s(1:3,1:3,1:nsym)
-  IF(.NOT. invsym) sym(1:3,1:3,nsym+1:nsym+nsym) = - s(1:3,1:3,1:nsym)  
+  ! IF .NOT. setup_pw, initialize tetrahedra
   !
-  ! Symmetries of this q
-  !
-  nsymqbz = nsymq
-  IF(minus_q) nsymqbz = nsymq * 2
-  !
-  ALLOCATE(symq(3,3,nsymqbz))
-  !
-  symq(1:3,1:3,1:nsymq) = s(1:3,1:3,1:nsymq)
-  IF(minus_q) symq(1:3,1:3,nsymq+1:nsymq+nsymq) = - s(1:3,1:3,1:nsymq)
-  !
-  ! Compute eig1, eig2, indx, grid
-  !
-  CALL dfpt_tetra_eig()
-  !
-  ALLOCATE(dfde(nbnd,nkBZ), occ(nbnd,nkBZ), beta(nbnd,nbnd,nkBZ))
+  CALL dfpt_tetra_setup()
   !
   ! Work Sharing
   !
-  nkpp = nkBZ / nproc
-  rest = mod(nkBZ, nproc)
-  IF(mpime < rest) THEN
-     sttk = (nkpp + 1) *  mpime + 1
-     lstk = (nkpp + 1) * (mpime + 1)
-  ELSE 
-     sttk = nkpp *  mpime + 1  + rest
-     lstk = nkpp * (mpime + 1) + rest
+  ntpp = ntetra / nproc_image
+  rest = MOD(ntetra, nproc_image)
+  IF(me_image < rest) THEN
+     tfst = (ntpp + 1) *  me_image + 1
+     tlst = (ntpp + 1) * (me_image + 1)
+  ELSE
+     tfst = ntpp *  me_image + 1  + rest
+     tlst = ntpp * (me_image + 1) + rest
   END IF
   !
-  ! Define type of tetra
-  !
-  CALL dfpt_tetra_init()
-  !
-  !alpha_pv = - MINVAL(eig1(1:nbnd,1:nkBZ))
+ ! alpha_pv = ef - MINVAL(et(1:nbnd,1:nkstot))
    alpha_pv = 0.d0
   !
-  ! Calculate occupation & its derivative
+  IF(lgamma) THEN
+     iq = 0
+  ELSE
+     iq = 1
+  END IF
   !
-  CALL dfpt_tetra_dlta_occ()
+  ! Calculate derivative of occupation
+  !
+  CALL dfpt_tetra_calc_delta(tfst,tlst,delta)
   !
   ! Integration weight(1st & 2nd term)
   !
-  beta(1:nbnd,1:nbnd,1:nkBZ) = 0d0
-  CALL dfpt_tetra_calc_beta1()
-  WRITE(stdout,*) "[dfpt_tetra]  beta1 : ", SUM(beta)
-  CALL dfpt_tetra_calc_beta2()
-  WRITE(stdout,*) "[dfpt_tetra]  beta2 : ", SUM(beta)
+  beta(1:nbnd,1:nbnd,1:nkstot) = 0.0_dp
+  CALL dfpt_tetra_calc_beta1(iq,tfst,tlst,beta)
+  WRITE(stdout,*) ""
+  !WRITE(stdout,*) "[dfpt_tetra]  beta1 : ", SUM(beta)
+  CALL dfpt_tetra_calc_beta2(iq,tfst,tlst,beta)
+  !WRITE(stdout,*) "[dfpt_tetra]  beta2 : ", SUM(beta)
   !
-  CALL mp_sum(beta(1:nbnd,1:nbnd,1:nkBZ), world_comm)
+  CALL mp_sum(beta(1:nbnd,1:nbnd,1:nkstot), intra_image_comm)
   !
-  dfde(       1:nbnd,1:nkBZ) = dfde(        1:nbnd,1:nkBZ) / REAL(6 * nkBZ, dp)
-  occ(        1:nbnd,1:nkBZ) =  occ(        1:nbnd,1:nkBZ) / REAL(6 * nkBZ, dp)
-  beta(1:nbnd,1:nbnd,1:nkBZ) = beta(1:nbnd, 1:nbnd,1:nkBZ) / REAL(6 * nkBZ, dp)
+  delta(      1:nbnd,1:nkstot) = delta(       1:nbnd,1:nkstot) / REAL(ntetra, dp)
+  beta(1:nbnd,1:nbnd,1:nkstot) = beta(1:nbnd, 1:nbnd,1:nkstot) / REAL(ntetra, dp)
   !
-  WRITE(stdout,'(a,e15.7)') "[dfpt_tetra]  Dos(E_F)[/Ry] : ", SUM(dfde) * 2d0
-  WRITE(stdout,'(a,e15.7)') "[dfpt_tetra]  # of electrons : ", SUM(occ) * 2d0
+  IF(nspin == 1) THEN
+     WRITE(stdout,'(a,e15.7)') "     [dfpt_tetra]  Dos(E_F)[/Ry] : ", SUM(delta) * 2.0_dp
+  ELSE
+     WRITE(stdout,'(a,e15.7)') "     [dfpt_tetra]  Dos(E_F)[/Ry] : ", SUM(delta)
+  END IF
   !
   ! Map k-point 
   !
-  IF(ALLOCATED(dfpt_tetra_dbl)) DEALLOCATE(dfpt_tetra_dbl) 
-  IF(ALLOCATED(dfpt_tetra_occ    )) DEALLOCATE(dfpt_tetra_occ    )
-  IF(ALLOCATED(dfpt_tetra_dlta   )) DEALLOCATE(dfpt_tetra_dlta   )
+  IF(ALLOCATED(dfpt_tetra_ttheta)) DEALLOCATE(dfpt_tetra_ttheta) 
+  IF(ALLOCATED(dfpt_tetra_delta )) DEALLOCATE(dfpt_tetra_delta )
   !
-  ALLOCATE(dfpt_tetra_dbl(nbnd,nbnd,nksq), &
-  &        dfpt_tetra_occ(nbnd,nksq), dfpt_tetra_dlta(nbnd,nksq))
+  ALLOCATE(dfpt_tetra_ttheta(nbnd,nbnd,nks), dfpt_tetra_delta(nbnd,nks))
   !
-  dfpt_tetra_dbl(1:nbnd,1:nbnd,1:nksq) = 0.0_dp
-  dfpt_tetra_occ(       1:nbnd,1:nksq) = 0.0_dp
-  dfpt_tetra_dlta(      1:nbnd,1:nksq) = 0.0_dp
-  !  
-  DO ik = 1, nksq
-     !
-     IF (lgamma) THEN
-        ikk = ik
-     ELSE
-        ikk = 2 * ik - 1
-     END IF
-     !
-     kv1(1:3) = MATMUL(xk(1:3,ikk), at(1:3,1:3))
-     nksym = 0
-     !
-     DO isym = 1, nsymqbz
-        !
-        kv2(1:3) = MATMUL(REAL(symq(1:3,1:3,isym), dp), kv1(1:3)) * REAL((/nk1, nk2, nk3/), dp)
-        ikv2(1:3) = NINT(kv2(1:3))
-        !
-        IF(ANY(ABS(kv2(1:3) - REAL(ikv2(1:3), dp)) > 1d-5)) CYCLE
-        !
-        ikv2(1:3) = MODULO(ikv2(1:3), (/nk1, nk2, nk3/)) + 1
-        ik2 = indx(ikv2(1), ikv2(2), ikv2(3))
-        !
-        nksym = nksym + 1
-        dfpt_tetra_dbl(1:nbnd,1:nbnd,ik) = dfpt_tetra_dbl( 1:nbnd,1:nbnd,ik) &
-        &                                          + beta( 1:nbnd,1:nbnd,ik2)
-        dfpt_tetra_occ(       1:nbnd,ik) = dfpt_tetra_occ( 1:nbnd,ik) &
-        &                                +            occ( 1:nbnd,ik2) 
-        dfpt_tetra_dlta(      1:nbnd,ik) = dfpt_tetra_dlta(1:nbnd,ik) &
-        &                                           + dfde(1:nbnd,ik2) 
-        !
-     END DO
-     !
-     dfpt_tetra_dbl(1:nbnd,1:nbnd,ik) = dfpt_tetra_dbl(1:nbnd,1:nbnd,ik) / REAL(nksym, dp)
-     dfpt_tetra_occ(       1:nbnd,ik) = dfpt_tetra_occ(       1:nbnd,ik) / REAL(nksym, dp)
-     dfpt_tetra_dlta(      1:nbnd,ik) = dfpt_tetra_dlta(      1:nbnd,ik) / REAL(nksym, dp)
-     !
-  END DO
-  !
-  ! Compute wg & nbnd_occ
-  ! 
-  DO ik = 1, nks
-     !
-     kv1(1:3) = MATMUL(xk(1:3,ik), at(1:3,1:3))
-     nksym = 0
-     !
-     wg(1:nbnd,ik) = 0d0
-     !
-     DO isym = 1, nsymbz
-        !
-        kv2(1:3) = MATMUL(REAL(sym(1:3,1:3,isym), dp), kv1(1:3)) * REAL((/nk1, nk2, nk3/), dp)
-        ikv2(1:3) = NINT(kv2(1:3))
-        !
-        IF(ANY(ABS(kv2(1:3) - REAL(ikv2(1:3), dp)) > 1d-5)) CYCLE
-        !
-        ikv2(1:3) = MODULO(ikv2(1:3), (/nk1, nk2, nk3/)) + 1
-        ik2 = indx(ikv2(1), ikv2(2), ikv2(3))
-        !
-        nksym = nksym + 1
-        wg(1:nbnd,ik) = wg(1:nbnd,ik) + occ(1:nbnd,ik2) 
-        !
-     END DO
-     !
-     wg(1:nbnd,ik) = wg(1:nbnd,ik) / REAL(nksym, dp) * REAL(nkBZ, dp)
-     !
-     !nbnd_occ(ik) = 0
-     !do ib = 1, nbnd
-     !  IF(wg(ib,ik) > 1d-8) nbnd_occ(ik) = ib
-     !END DO
-     nbnd_occ(ik) = nbnd
-     !
-     wg(1:nbnd,ik) = wg(1:nbnd,ik) * wk(ik)
-     !
-  END DO ! ik = 1, nks
+  CALL poolscatter( nbnd,      nkstot, delta, nks,dfpt_tetra_delta )
+  CALL poolscatter( nbnd*nbnd, nkstot, beta,  nks,dfpt_tetra_ttheta)
   !
   ! Integration weight(3rd term)
   !
-  beta(1:nbnd,1:nbnd,1:nkBZ) = 0d0
-  CALL dfpt_tetra_calc_beta3()
-  WRITE(stdout,*) "[dfpt_tetra]  beta3 : ", SUM(beta)
+  beta(1:nbnd,1:nbnd,1:nkstot) = 0.0_dp
+  CALL dfpt_tetra_calc_beta3(iq,tfst,tlst,beta)
+  !WRITE(stdout,*) "[dfpt_tetra]  beta3 : ", SUM(beta)
   !
-  beta(1:nbnd,1:nbnd,1:nkBZ) = beta(1:nbnd, 1:nbnd,1:nkBZ) / REAL(6 * nkBZ, dp)
+  beta(1:nbnd,1:nbnd,1:nkstot) = beta(1:nbnd, 1:nbnd,1:nkstot) / REAL(ntetra, dp)
   !
-  kv1(1:3) = MATMUL(xq(1:3), at(1:3,1:3))
-  kv1(1:3) = ABS(kv1(1:3) - REAL(NINT(kv1(1:3)), dp))
-  !
-  IF(lgamma .OR. MAXVAL(kv1(1:3)) < 1d-8) THEN
-     !
-     WRITE(stdout,*) "[dfpt_tetra]  Add Drude term"
-     !
-     DO ik = sttk, lstk
-        DO ib = 1, nbnd
-           beta(ib,ib,ik) = beta(ib, ib, ik) &
-           &              - dfde(    ib, ik) * 0.5_dp
-        END DO
-     END DO
-  END IF
-  !
-  CALL mp_sum(beta(1:nbnd,1:nbnd,1:nkBZ), world_comm)
+  CALL mp_sum(beta(1:nbnd,1:nbnd,1:nkstot), intra_image_comm)
   !
   ! Map k-point 
   !
   IF(ALLOCATED(dfpt_tetra_beta)) DEALLOCATE(dfpt_tetra_beta)
-  ALLOCATE(dfpt_tetra_beta(nbnd,nbnd,nksq))
+  ALLOCATE(dfpt_tetra_beta(nbnd,nbnd,nks))
   !
-  dfpt_tetra_beta(1:nbnd,1:nbnd,1:nksq) = 0d0
+  CALL poolscatter( nbnd,      nkstot, et,   nks, et             )
+  CALL poolscatter( nbnd*nbnd, nkstot, beta, nks, dfpt_tetra_beta)
+  CALL dfpt_tetra_average_beta(dfpt_tetra_ttheta)
+  CALL dfpt_tetra_average_beta(dfpt_tetra_beta)
   !
-  DO ik = 1, nksq
-     !
-     IF (lgamma) THEN
-        ikk = ik
-        ikq = ik
-     ELSE
-        ikk = 2 * ik - 1
-        ikq = ikk + 1
+  IF(nspin == 1) THEN
+     dfpt_tetra_ttheta(1:nbnd,1:nbnd,1:nks) = dfpt_tetra_ttheta(1:nbnd,1:nbnd,1:nks) * 2.0_dp
+     dfpt_tetra_beta(  1:nbnd,1:nbnd,1:nks) = dfpt_tetra_beta(  1:nbnd,1:nbnd,1:nks) * 2.0_dp
+     dfpt_tetra_delta(        1:nbnd,1:nks) = dfpt_tetra_delta(        1:nbnd,1:nks) * 2.0_dp
+  END IF
+  !
+  DO ik = 1, nks
+     IF(ABS(wk(ik)) > 1e-10_dp) THEN
+        dfpt_tetra_ttheta(1:nbnd,1:nbnd,ik) = dfpt_tetra_ttheta(1:nbnd,1:nbnd,ik) / wk(ik)
+        dfpt_tetra_beta(  1:nbnd,1:nbnd,ik) = dfpt_tetra_beta(  1:nbnd,1:nbnd,ik) / wk(ik)
+        dfpt_tetra_delta(        1:nbnd,ik) = dfpt_tetra_delta(        1:nbnd,ik) / wk(ik)
      END IF
-     !
-     kv1(1:3) = MATMUL(xk(1:3,ikk), at(1:3,1:3))
-     nksym = 0
-     !
-     DO isym = 1, nsymqbz
-        !
-        kv2(1:3) = MATMUL(REAL(symq(1:3,1:3,isym), dp), kv1(1:3)) * REAL((/nk1, nk2, nk3/), dp)
-        ikv2(1:3) = NINT(kv2(1:3))
-        !
-        IF(ANY(ABS(kv2(1:3) - REAL(ikv2(1:3), dp)) > 1d-5)) CYCLE
-        !
-        ikv2(1:3) = MODULO(ikv2(1:3), (/nk1, nk2, nk3/)) + 1
-        ik2 = indx(ikv2(1),ikv2(2),ikv2(3))
-        !
-        nksym = nksym + 1
-        dfpt_tetra_beta(1:nbnd,1:nbnd,ik) = dfpt_tetra_beta(1:nbnd,1:nbnd,ik) &
-        &                                            + beta(1:nbnd,1:nbnd,ik2) 
-        !
-     END DO ! isym = 1, nsymqbz
-     !
-     dfpt_tetra_beta(1:nbnd,1:nbnd,ik) = &
-     &     dfpt_tetra_beta(1:nbnd,1:nbnd,ik) / REAL(nksym, dp)
-     !
-  END DO ! ik = 1, nksq
+!     nbnd_occ(ik) = nbnd
+  END DO
   !
-  dfpt_tetra_beta(1:nbnd,1:nbnd,1:nksq) = dfpt_tetra_dbl(1:nbnd,1:nbnd,1:nksq) &
-  &                                    + dfpt_tetra_beta(1:nbnd,1:nbnd,1:nksq) * alpha_pv
+  ! Drude term
   !
-  dfpt_tetra_occ(        1:nbnd,1:nksq) = dfpt_tetra_occ(        1:nbnd,1:nksq) * REAL(nkBZ, dp)
-  dfpt_tetra_dlta(       1:nbnd,1:nksq) = dfpt_tetra_dlta(       1:nbnd,1:nksq) * REAL(nkBZ, dp)
-  dfpt_tetra_beta(1:nbnd,1:nbnd,1:nksq) = dfpt_tetra_beta(1:nbnd,1:nbnd,1:nksq) * REAL(nkBZ, dp)
-  dfpt_tetra_dbl( 1:nbnd,1:nbnd,1:nksq) = dfpt_tetra_dbl( 1:nbnd,1:nbnd,1:nksq) * REAL(nkBZ, dp)
+  qvec(1:3) = MATMUL(xq(1:3), at(1:3,1:3))
+  qvec(1:3) = ABS(qvec(1:3) - REAL(NINT(qvec(1:3)), dp))
   !
-  DEALLOCATE(eig1,eig2,grid,indx,symq,sym)
-  DEALLOCATE(occ,dfde,beta)
+  IF(lgamma .OR. MAXVAL(qvec(1:3)) < 1e-8_dp) THEN
+     !
+     WRITE(stdout,'(a)') "     [dfpt_tetra]  Add Drude term"
+     !
+     DO ik = 1, nks
+        DO ibnd = 1, nbnd
+           dfpt_tetra_beta(ibnd,ibnd,ik) = dfpt_tetra_beta(ibnd, ibnd, ik) &
+           &                   - 0.5_dp * dfpt_tetra_delta(      ibnd, ik)
+        END DO
+     END DO
+  END IF
+  !
+  dfpt_tetra_beta(1:nbnd,1:nbnd,1:nks) = dfpt_tetra_ttheta(1:nbnd,1:nbnd,1:nks) &
+  &                           + alpha_pv * dfpt_tetra_beta(1:nbnd,1:nbnd,1:nks)
+  !
+  DEALLOCATE(delta,beta)
   !
 END SUBROUTINE dfpt_tetra_main
 !
-!--------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_eig()
+!----------------------------------------------------------------------------
+SUBROUTINE dfpt_tetra_setup()
   !--------------------------------------------------------------------------
   !
-  ! This routine collect eig_{k} & eig_{k + q} in whole of the Brillouin zone.
+  ! This routine initialize tetrahedra, if it is not done in setup_nscf
   !
   USE kinds,      ONLY : dp
-  USE cell_base,  ONLY : at
-  USE mp,         ONLY : mp_sum
-  USE klist,      ONLY : xk
-  USE wvfct,      ONLY : nbnd, et
-  USE symm_base,  ONLY : s
-  USE mp_global,   ONLY : inter_pool_comm
-  USE start_k,    ONLY : nk1, nk2, nk3
-  USE qpoint,     ONLY : nksq
-  USE control_ph, ONLY : lgamma
-  USE ener,       ONLY : ef
+  USE lsda_mod,   ONLY : nspin
+  USE ktetra,     ONLY : ntetra, tetra
+  USE klist,      ONLY : xk, nks, nkstot
+  USE start_k, ONLY : nk1, nk2, nk3, k1, k2, k3
+  USE symm_base, ONLY : s, t_rev, time_reversal
+  USE cell_base, ONLY : at, bg
+  USE modes, ONLY : nsymq
+  USE parameters,         ONLY : npk
+  USE opt_tetra_mod, ONLY : opt_tetra_init
   !
   IMPLICIT NONE
   !
-  INTEGER :: ik, ik2, ikk, ikq, isym, ikv2(3), i1, i2, i3
-  REAL(dp) :: kv1(3), kv2(3)
+  INTEGER :: nktot
   !
-  nkBZ = nk1 * nk2 * nk3
-  !
-  ALLOCATE(eig1(nbnd, nkBZ), eig2(nbnd, nkBZ), &
-  &        grid(3,nkBZ), indx(nk1,nk2,nk3))
-  !
-  ! K-grid
-  !
-  ik = 0
-  DO i3 = 1, nk3
-     DO i2 = 1, nk2
-        DO i1 = 1, nk1
-           !
-           ik = ik + 1
-           grid(1:3,ik) = (/ i1, i2, i3 /) - 1
-           indx(i1, i2, i3) = ik
-           !
-        END DO
-     END DO
-  END DO
-  !
-  eig1(1:nbnd,1:nkBZ) = 0d0
-  eig2(1:nbnd,1:nkBZ) = 0d0
-  !
-  DO ik = 1, nksq
+  IF (dfpt_tetra_linit) THEN
      !
-     IF (lgamma) THEN
-        ikk = ik
-        ikq = ik
+     CALL poolcollect(xk, 3, nkstot, nks)
+     !
+     IF(nspin == 2) THEN
+        nktot = nkstot / 2
      ELSE
-        ikk = 2 * ik - 1
-        ikq = ikk + 1
+        nktot = nkstot
      END IF
      !
-     kv1(1:3) = MATMUL(xk(1:3,ikk), at(1:3,1:3))
+     ntetra = 6 * nk1 * nk2 * nk3
+     IF(ALLOCATED(tetra)) DEALLOCATE(tetra)
+     ALLOCATE( tetra( 20, ntetra ) )
+     CALL opt_tetra_init(nsymq, s, time_reversal, t_rev, at, bg, npk, k1, k2, k3, &
+     &                   nk1, nk2, nk3, nktot, xk, tetra, 1)
      !
-     DO isym = 1, nsymqbz
-        !
-        kv2(1:3) = MATMUL(REAL(symq(1:3,1:3,isym), dp), kv1(1:3)) * REAL((/nk1, nk2, nk3/), dp)
-        ikv2(1:3) = NINT(kv2(1:3))
-        !
-        IF(ANY(ABS(kv2(1:3) - REAL(ikv2(1:3), dp)) > 1d-5)) CYCLE
-        !
-        ikv2(1:3) = MODULO(ikv2(1:3), (/nk1, nk2, nk3/)) + 1
-        ik2 = indx(ikv2(1),ikv2(2),ikv2(3))
-        !
-        eig1(1:nbnd,ik2) = et(1:nbnd,ikk) - ef
-        eig2(1:nbnd,ik2) = et(1:nbnd,ikq) - ef
-        !
-     END DO
-     !
-  END DO
-  !
-  CALL mp_sum(eig1, inter_pool_comm )
-  CALL mp_sum(eig2, inter_pool_comm )
-  !
-END SUBROUTINE dfpt_tetra_eig
-!
-!--------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_init()
-  !--------------------------------------------------------------------------
-  !
-  ! This routine compute 20 points and weights for the optimized tetrahedron metod.
-  !
-  use kinds, only : dp
-  USE cell_base, ONLY : bg
-  USE io_global, ONLY : stdout
-  USE start_k,    ONLY : nk1, nk2, nk3
-  USE opt_tetra_mod, ONLY : tetra_type
-  !
-  IMPLICIT NONE
-  !
-  INTEGER :: itype, i1, i2, i3, it, &
-  &          divvec(4,4), ivvec0(4)
-  REAL(dp) :: l(4), bvec2(3,3), bvec3(3,4)
-  !
-  bvec2(1:3,1) = bg(1:3,1) / REAL(nk1, dp)
-  bvec2(1:3,2) = bg(1:3,2) / REAL(nk2, dp)
-  bvec2(1:3,3) = bg(1:3,3) / REAL(nk3, dp)
-  !
-  bvec3(1:3,1) = -bvec2(1:3,1) + bvec2(1:3,2) + bvec2(1:3,3)
-  bvec3(1:3,2) =  bvec2(1:3,1) - bvec2(1:3,2) + bvec2(1:3,3)
-  bvec3(1:3,3) =  bvec2(1:3,1) + bvec2(1:3,2) - bvec2(1:3,3)
-  bvec3(1:3,4) =  bvec2(1:3,1) + bvec2(1:3,2) + bvec2(1:3,3)
-  !
-  ! length of delta bvec
-  !
-  DO i1 = 1, 4
-     l(i1) = DOT_PRODUCT(bvec3(1:3,i1),bvec3(1:3,i1))
-  END DO
-  !
-  itype = MINLOC(l(1:4),1)
-  !
-  ! start & last
-  !
-  ivvec0(1:4) = (/ 0, 0, 0, 0 /)
-  !
-  divvec(1:4,1) = (/ 1, 0, 0, 0 /)
-  divvec(1:4,2) = (/ 0, 1, 0, 0 /)
-  divvec(1:4,3) = (/ 0, 0, 1, 0 /)
-  divvec(1:4,4) = (/ 0, 0, 0, 1 /)
-  !
-  ivvec0(itype) = 1
-  divvec(itype, itype) = - 1
-  !
-  it = 0
-  DO i1 = 1, 3
-     DO i2 = 1, 3
-        IF(i2 == i1) CYCLE
-        DO i3 = 1, 3
-           IF(i3 == i1 .OR. i3 == i2) CYCLE
-           !
-           it = it + 1
-           !
-           ivvec(1:3,1,it) = ivvec0(1:3)
-           ivvec(1:3,2,it) = ivvec(1:3,1,it) + divvec(1:3,i1)
-           ivvec(1:3,3,it) = ivvec(1:3,2,it) + divvec(1:3,i2)
-           ivvec(1:3,4,it) = ivvec(1:3,3,it) + divvec(1:3,i3)
-           !
-        END DO
-     END DO
-  END DO
-  !
-  ivvec(1:3, 5,1:6) = 2 * ivvec(1:3,1,1:6) - ivvec(1:3,2,1:6)
-  ivvec(1:3, 6,1:6) = 2 * ivvec(1:3,2,1:6) - ivvec(1:3,3,1:6)
-  ivvec(1:3, 7,1:6) = 2 * ivvec(1:3,3,1:6) - ivvec(1:3,4,1:6)
-  ivvec(1:3, 8,1:6) = 2 * ivvec(1:3,4,1:6) - ivvec(1:3,1,1:6)
-  !
-  ivvec(1:3, 9,1:6) = 2 * ivvec(1:3,1,1:6) - ivvec(1:3,3,1:6)
-  ivvec(1:3,10,1:6) = 2 * ivvec(1:3,2,1:6) - ivvec(1:3,4,1:6)
-  ivvec(1:3,11,1:6) = 2 * ivvec(1:3,3,1:6) - ivvec(1:3,1,1:6)
-  ivvec(1:3,12,1:6) = 2 * ivvec(1:3,4,1:6) - ivvec(1:3,2,1:6)
-  !
-  ivvec(1:3,13,1:6) = 2 * ivvec(1:3,1,1:6) - ivvec(1:3,4,1:6)
-  ivvec(1:3,14,1:6) = 2 * ivvec(1:3,2,1:6) - ivvec(1:3,1,1:6)
-  ivvec(1:3,15,1:6) = 2 * ivvec(1:3,3,1:6) - ivvec(1:3,2,1:6)
-  ivvec(1:3,16,1:6) = 2 * ivvec(1:3,4,1:6) - ivvec(1:3,3,1:6)
-  !
-  ivvec(1:3,17,1:6) =  ivvec(1:3,4,1:6) - ivvec(1:3,1,1:6) + ivvec(1:3,2,1:6)
-  ivvec(1:3,18,1:6) =  ivvec(1:3,1,1:6) - ivvec(1:3,2,1:6) + ivvec(1:3,3,1:6)
-  ivvec(1:3,19,1:6) =  ivvec(1:3,2,1:6) - ivvec(1:3,3,1:6) + ivvec(1:3,4,1:6)
-  ivvec(1:3,20,1:6) =  ivvec(1:3,3,1:6) - ivvec(1:3,4,1:6) + ivvec(1:3,1,1:6)
-  !
-  IF(tetra_type == 1) THEN
-     !
-     WRITE(stdout,*) "[dfpt_tetra]  Linear tetrahedron method is used."
-     !
-     wlsm(1:4,1:20) = 0.0_dp
-     wlsm(1,1) = 1.0_dp
-     wlsm(2,2) = 1.0_dp
-     wlsm(3,3) = 1.0_dp
-     wlsm(4,4) = 1.0_dp
-     !
-  ELSE IF(tetra_type == 2) THEN
-     !
-     WRITE(stdout,*) "[dfpt_tetra]  Optimized tetrahedron method is used."
-     !
-     wlsm(1, 1: 4) = REAL((/1440,    0,   30,    0/), dp)
-     wlsm(2, 1: 4) = REAL((/   0, 1440,    0,   30/), dp)
-     wlsm(3, 1: 4) = REAL((/  30,    0, 1440,    0/), dp)
-     wlsm(4, 1: 4) = REAL((/   0,   30,    0, 1440/), dp)
-     !
-     wlsm(1, 5: 8) = REAL((/ -38,    7,   17,  -28/), dp)
-     wlsm(2, 5: 8) = REAL((/ -28,  -38,    7,   17/), dp)
-     wlsm(3, 5: 8) = REAL((/  17,  -28,  -38,    7/), dp)
-     wlsm(4, 5: 8) = REAL((/   7,   17,  -28,  -38/), dp)
-     !
-     wlsm(1, 9:12) = REAL((/ -56,    9,  -46,    9/), dp)
-     wlsm(2, 9:12) = REAL((/   9,  -56,    9,  -46/), dp)
-     wlsm(3, 9:12) = REAL((/ -46,    9,  -56,    9/), dp)
-     wlsm(4, 9:12) = REAL((/   9,  -46,    9,  -56/), dp)
-     !
-     wlsm(1,13:16) = REAL((/ -38,  -28,   17,    7/), dp)
-     wlsm(2,13:16) = REAL((/   7,  -38,  -28,   17/), dp)
-     wlsm(3,13:16) = REAL((/  17,    7,  -38,  -28/), dp)
-     wlsm(4,13:16) = REAL((/ -28,   17,    7,  -38/), dp)
-     !
-     wlsm(1,17:20) = REAL((/ -18,  -18,   12,  -18/), dp)
-     wlsm(2,17:20) = REAL((/ -18,  -18,  -18,   12/), dp)
-     wlsm(3,17:20) = REAL((/  12,  -18,  -18,  -18/), dp)
-     wlsm(4,17:20) = REAL((/ -18,   12,  -18,  -18/), dp)
-     !
-     wlsm(1:4,1:20) = wlsm(1:4,1:20) / 1260_dp
-     !
-  ELSE
-     !
-     CALL errore("dfpt_tetra_init", "tetra_type is invalid", tetra_type)
+     CALL poolscatter(3, nkstot, xk, nks, xk)
      !
   END IF
   !
-END SUBROUTINE dfpt_tetra_init
+END SUBROUTINE dfpt_tetra_setup
 !
 !--------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_dlta_occ()
+SUBROUTINE dfpt_tetra_calc_delta(tfst,tlst,delta)
   !--------------------------------------------------------------------------
   !
-  ! This routine compute occupation & its derivative
+  ! This routine compute derivative of occupation
   !
+  USE ener,  ONLY : ef
   USE kinds, ONLY : dp
-  USE wvfct, ONLY : nbnd
-  USE start_k, ONLY : nk1, nk2, nk3
+  USE klist, ONLY : nkstot
+  USE ktetra, ONLY : ntetra, tetra
+  USE wvfct, ONLY : nbnd, et
+  USE lsda_mod,   ONLY : nspin
   USE mp,         ONLY : mp_sum
-  USE mp_global,   ONLY : world_comm
+  USE mp_global,   ONLY : intra_image_comm
+  USE opt_tetra_mod, ONLY : wlsm
   !
   IMPLICIT NONE
   !
-  INTEGER :: ik, ikk, it, ib, jb, kb, ikv(3), ii
-  REAL(dp) :: ei(nbnd,4), e(4), a(4,4), C(3), w0(4,4), tmp(5,4), &
-  &           wdos1(4,nbnd), wocc1(4,nbnd), wdos(4), wocc(4), wdos2, wocc2
+  INTEGER,INTENT(IN) :: tfst, tlst
+  REAL(dp),INTENT(OUT) :: delta(nbnd,nkstot)
   !
-  occ(1:nbnd,1:nkBZ) = 0.0_dp
-  dfde(1:nbnd,1:nkBZ) = 0.0_dp
+  INTEGER :: nspin_lsda, ns, nt, nk, ii, ibnd, jbnd, kbnd, itetra(4), ik
+  REAL(dp) :: ei(4,nbnd), e(4), wdos1(4), a(4,4), V, wdos0(4,nbnd), wdos2
   !
-  w0(1:4,1:4) = 0d0
-  DO ii = 1, 4
-     w0(ii,ii) = 1d0
-  END DO
+  delta(1:nbnd,1:nkstot) = 0.0_dp
   !
-  DO ik = sttk, lstk
+  IF ( nspin == 2 ) THEN
+     nspin_lsda = 2
+  ELSE
+     nspin_lsda = 1
+  END IF
+  !
+  DO ns = 1, nspin_lsda
      !
-     DO it = 1, 6
+     ! nk is used to select k-points with up (ns=1) or down (ns=2) spin
+     !
+     IF (ns == 1) THEN
+        nk = 0
+     ELSE
+        nk = nkstot / 2
+     END IF
+     !
+     DO nt = tfst, tlst
         !
-        ei(1:nbnd,1:4) = 0d0
-        !
+        ei(1:4,1:nbnd) = 0.0_dp
         DO ii = 1, 20
            !
-           ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-           ikv(1:3) = MODULO(ikv(1:3),(/nk1, nk2, nk3/)) + 1
-           ikk = indx(ikv(1),ikv(2),ikv(3))
-           !
-           DO ib = 1, nbnd
-              ei(ib,1:4) = ei(ib,1:4) &
-              &          + wlsm(1:4,ii) * eig1(ib,ikk)
+           ik = tetra(ii, nt) + nk
+           !        
+           DO ibnd = 1, nbnd
+              ei(1:4, ibnd) = ei(1:4, ibnd) + wlsm(1:4,ii) * (et(ibnd,ik) - ef)
            END DO
            !
         END DO
         !
-        DO ib = 1, nbnd
+        wdos0(1:nbnd,1:4) = 0.0_dp
+        !
+        DO ibnd = 1, nbnd
            !
-           tmp(1,1:4) = ei(ib,1:4)
-           tmp(2:5,1:4) = w0(1:4, 1:4)
-           !
-           CALL dfpt_tetra_sort(5,4,tmp)
-           !
-           e(1:4) = tmp(1,1:4)
+           itetra(1) = 0
+           e(1:4) = ei(1:4,ibnd)
+           call hpsort (4, e, itetra)
            !
            DO ii = 1, 4
-              a(ii,1:4) = ( 0_dp - e(1:4) ) / (e(ii) - e(1:4))
+              a(ii,1:4) = ( 0.0_dp - e(1:4) ) / (e(ii) - e(1:4))
            END DO
            !
-           IF(e(1) <= 0_dp .AND. 0_dp < e(2)) THEN
+           IF(e(1) <= 0.0_dp .AND. 0.0_dp < e(2)) THEN
               !
-              ! DOS
+              V = a(2,1) * a(3,1) * a(4,1) / (0_dp - e(1) )
+              wdos1(1) = a(1,2) + a(1,3) + a(1,4)
+              wdos1(2:4) = a(2:4,1)
+              wdos1(1:4) = wdos1(1:4) * V
               !
-              C(1) = a(2,1) * a(3,1) * a(4,1) / (0_dp - e(1) )
-              wdos(1) = a(1,2) + a(1,3) + a(1,4)
-              wdos(2:4) = a(2:4,1)
-              wdos(1:4) = wdos(1:4) * C(1)
+           ELSE IF(e(2) <= 0.0_dp .AND. 0.0_dp < e(3)) THEN
               !
-              ! OCCUPATION
+              V = a(2,3) * a(3,1) + a(3,2) * a(2,4)
+              wdos1(1) = a(1,4) * V + a(1,3) * a(3,1) * a(2,3)
+              wdos1(2) = a(2,3) * V + a(2,4) * a(2,4) * a(3,2)
+              wdos1(3) = a(3,2) * V + a(3,1) * a(3,1) * a(2,3)
+              wdos1(4) = a(4,1) * V + a(4,2) * a(2,4) * a(3,2)
+              V  = 1.0_dp / ( e(4) - e(1) )
+              wdos1(1:4) = wdos1(1:4) * V
               !
-              C(1) = a(2,1) * a(3,1) *  a(4,1) / 4d0
-              wocc(1) = C(1) * (1d0 + a(1,2) + a(1,3) + a(1,4))
-              wocc(2) = C(1) * a(2,1)
-              wocc(3) = C(1) * a(3,1)
-              wocc(4) = C(1) * a(4,1)
+           ELSE IF(e(3) <= 0.0_dp .AND. 0.0_dp < e(4)) THEN
               !
-           ELSE IF(e(2) <= 0_dp .AND. 0_dp < e(3)) THEN
-              !
-              ! DOS
-              !
-              C(1) = a(2,3) * a(3,1) + a(3,2) * a(2,4)
-              wdos(1) = a(1,4) * C(1) + a(1,3) * a(3,1) * a(2,3)
-              wdos(2) = a(2,3) * C(1) + a(2,4) * a(2,4) * a(3,2)
-              wdos(3) = a(3,2) * C(1) + a(3,1) * a(3,1) * a(2,3)
-              wdos(4) = a(4,1) * C(1) + a(4,2) * a(2,4) * a(3,2)
-              C(1)  = 1d0 / ( e(4) - e(1) )
-              wdos(1:4) = wdos(1:4) * C(1)
-              !
-              ! OCCUPATION
-              !
-              C(1) = a(4,1) * a(3,1) / 4d0
-              C(2) = a(4,1) * a(3,2) * a(1,3) / 4d0
-              C(3) = a(4,2) * a(3,2) * a(1,4) / 4d0
-              !
-              wocc(1) = C(1) + (C(1) + C(2)) * a(1,3) + (C(1) + C(2) + C(3)) * a(1,4)
-              wocc(2) = C(1) + C(2) + C(3) + (C(2) + C(3)) * a(2,3) + C(3) * a(2,4)
-              wocc(3) = (C(1) + C(2)) * a(3,1) + (C(2) + C(3)) * a(3,2)
-              wocc(4) = (C(1) + C(2) + C(3)) * a(4,1) + C(3) * a(4,2)
-              !
-           ELSE IF(e(3) <= 0_dp .AND. 0_dp < e(4)) THEN
-              !
-              ! DOS
-              !
-              C(1) = a(1,4) * a(2,4) * a(3,4) / ( e(4) - 0_dp )
-              wdos(1:3)  = a(1:3,4)
-              wdos(4)  = a(4,1) + a(4,2) + a(4,3)
-              wdos(1:4) = wdos(1:4) * C(1)
-              !
-              ! OCCUPATION
-              !
-              C(1) = a(1,4) * a(2,4) * a(3,4)
-              !
-              wocc(1) = 1d0 - C(1) * a(1,4)
-              wocc(2) = 1d0 - C(1) * a(2,4)
-              wocc(3) = 1d0 - C(1) * a(3,4)
-              wocc(4) = 1d0 - C(1) * (1d0 + a(4,1) + a(4,2) + a(4,3))
-              !
-              wocc(1:4) = wocc(1:4) / 4d0
-              !
-           ELSE IF(e(4) <= 0_dp) THEN
-              !
-              wdos(1:4) = 0d0
-              wocc(1:4) = 1d0 / 4d0
+              V = a(1,4) * a(2,4) * a(3,4) / ( e(4) - 0.0_dp )
+              wdos1(1:3)  = a(1:3,4)
+              wdos1(4)  = a(4,1) + a(4,2) + a(4,3)
+              wdos1(1:4) = wdos1(1:4) * V
               !
            ELSE
               !
-              wdos(1:4) = 0d0
-              wocc(1:4) = 0d0
+              wdos1(1:4) = 0.0_dp
               !
            END IF
            !
-           wdos1(1:4, ib) = MATMUL(tmp(2:5, 1:4), wdos(1:4))
-           wocc1(1:4, ib) = MATMUL(tmp(2:5, 1:4), wocc(1:4))
+           wdos0(itetra(1:4),ibnd) = wdos1(1:4)
            !
         END DO ! ib
         !
         DO ii = 1, 20
            !
-           ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-           ikv(1:3) = MODULO(ikv(1:3), (/nk1, nk2, nk3/)) + 1
-           ikk = indx(ikv(1),ikv(2),ikv(3))
-           !
-           dfde(1:nbnd,ikk) = dfde(1:nbnd,ikk) &
-           &            + MATMUL(wlsm(1:4,ii), wdos1(1:4,1:nbnd))
-           occ( 1:nbnd,ikk) = occ( 1:nbnd,ikk) &
-           &            + MATMUL(wlsm(1:4,ii), wocc1(1:4,1:nbnd))
+           ik = tetra(ii, nt) + nk
+           delta(1:nbnd,ik) = delta(1:nbnd,ik) &
+           &            + MATMUL(wlsm(1:4,ii), wdos0(1:4,1:nbnd))
            !
         END DO
         !
@@ -673,22 +338,19 @@ SUBROUTINE dfpt_tetra_dlta_occ()
   !
   ! Average weights of degenerated states
   !
-  DO ik = sttk, lstk
-     DO ib = 1, nbnd
+  DO ik = 1, nkstot
+     DO ibnd = 1, nbnd
         !
-        wdos2 = dfde(ib,ik)
-        wocc2 = occ( ib,ik)
+        wdos2 = delta(ibnd,ik)
         !
-        DO jb = ib + 1, nbnd
+        DO jbnd = ibnd + 1, nbnd
            !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              wdos2 = wdos2 + dfde(jb,ik)
-              wocc2 = wocc2 +  occ(jb,ik)
+           IF(ABS(et(ibnd,ik) - et(jbnd,ik)) < 1e-6_dp) THEN
+              wdos2 = wdos2 + delta(jbnd,ik)
            ELSE
               !
-              DO kb = ib, jb - 1
-                 dfde(kb,ik) = wdos2 / real(jb - ib, dp)
-                 occ( kb,ik) = wocc2 / real(jb - ib, dp)
+              DO kbnd = ibnd, jbnd - 1
+                 delta(kbnd,ik) = wdos2 / real(jbnd - ibnd, dp)
               END DO
               !
               EXIT
@@ -699,77 +361,76 @@ SUBROUTINE dfpt_tetra_dlta_occ()
      END DO
   END DO
   !
-  CALL mp_sum(occ(1:nbnd,1:nkBZ), world_comm)
-  CALL mp_sum(dfde(1:nbnd,1:nkBZ), world_comm)
+  CALL mp_sum(delta(1:nbnd,1:nkstot), intra_image_comm)
   !
-END SUBROUTINE dfpt_tetra_dlta_occ
+END SUBROUTINE dfpt_tetra_calc_delta
 !
 !--------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_calc_beta1()
+SUBROUTINE dfpt_tetra_calc_beta1(iq,tfst,tlst,beta)
   !--------------------------------------------------------------------------
   !
   ! This routine compute the first term of (B 28) in PRB 64, 235118 (2001).
   !
   USE kinds, ONLY : dp
-  USE wvfct, ONLY : nbnd
-  USE start_k, ONLY : nk1, nk2, nk3
+  USE wvfct, ONLY : nbnd, et
+  USE ener,  ONLY : ef
+  USE klist, ONLY : nkstot
+  USE ktetra, ONLY : ntetra, tetra
+  USE opt_tetra_mod, ONLY : wlsm
+  USE lsda_mod,   ONLY : nspin
   !
   IMPLICIT NONE
   !
-  INTEGER :: ik, it, ib, jb, kb, ikv(3), ii, ikk
-  REAL(dp) :: thr = 1d-8, V, e(4), a(4,4)
-  REAL(dp) :: ei(nbnd,4), ej(nbnd,4), ei2(4), ej2(nbnd,4)
-  REAL(dp) :: tmp(6,nbnd,4), tmp2(6,nbnd,4)
-  REAL(dp) :: w1(4,nbnd), w2(4,nbnd,4), beta2(nbnd)
-  REAL(dp),ALLOCATABLE :: w0(:,:,:)
+  INTEGER,INTENT(IN) :: iq, tfst, tlst
+  REAL(dp),INTENT(INOUT) :: beta(nbnd,nbnd,nkstot)
   !
-  ALLOCATE(w0(4,nbnd,4))
+  INTEGER :: nspin_lsda, ns, nt, nk, ii, jj, ibnd, itetra(4), ik
+  REAL(dp) :: thr = 1e-8_dp, V, tsmall(4,4), ei0(4,nbnd), ej0(4,nbnd), e(4), &
+  &           ei1(4), ej1(4,nbnd), a(4,4), w0(nbnd,nbnd,4), w1(nbnd,4)
   !
-  w0(1:4,1:nbnd,1:4) = 0d0
-  DO ii = 1, 4
-     w0(ii,1:nbnd,ii) = 1d0
-  END DO
-  tmp(1:6,1:nbnd,1:4) = 0d0
+  IF ( nspin == 2 ) THEN
+     nspin_lsda = 2
+  ELSE
+     nspin_lsda = 1
+  END IF
   !
-  DO ik = sttk, lstk
+  DO ns = 1, nspin_lsda
      !
-     DO it = 1, 6
+     ! nk is used to select k-points with up (ns=1) or down (ns=2) spin
+     !
+     IF (ns == 1) THEN
+        nk = 0
+     ELSE
+        nk = nkstot / 2
+     END IF
+     !
+     DO nt = tfst, tlst
         !
-        ei(1:nbnd, 1:4) = 0d0
-        ej(1:nbnd, 1:4) = 0d0
-        !
+        ei0(1:4,1:nbnd) = 0.0_dp
+        ej0(1:4,1:nbnd) = 0.0_dp
         DO ii = 1, 20
            !
-           ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-           ikv(1:3) = MODULO(ikv(1:3),(/nk1, nk2, nk3/)) + 1
-           ikk = indx(ikv(1),ikv(2),ikv(3))
-           !
-           DO ib = 1, nbnd
-              !
-              ei(ib, 1:4) = ei(ib, 1:4) + wlsm(1:4,ii) * eig1(ib, ikk)
-              ej(ib, 1:4) = ej(ib, 1:4) + wlsm(1:4,ii) * eig2(ib, ikk)
-              !               
+           ik = tetra(ii, nt) + nk
+           DO ibnd = 1, nbnd
+              ei0(1:4,ibnd) = ei0(1:4,ibnd) + wlsm(1:4,ii) * (et(ibnd, ik)    - ef)
+              ej0(1:4,ibnd) = ej0(1:4,ibnd) + wlsm(1:4,ii) * (et(ibnd, ik+iq) - ef)
            END DO
            !
         END DO
         !
-        DO ib = 1, nbnd
+        w0(1:nbnd,1:nbnd,1:4) = 0.0_dp
+        !
+        DO ibnd = 1, nbnd
            !
-           w1(1:4,1:nbnd) = 0d0
-           !
-           tmp(1,        1, 1:4) = ei(         ib, 1:4)
-           tmp(2,   1:nbnd, 1:4) = ej(     1:nbnd, 1:4)
-           tmp(3:6, 1:nbnd, 1:4) = w0(1:4, 1:nbnd, 1:4)
-           !
-           CALL dfpt_tetra_sort(6 * nbnd, 4, tmp)
-           !
-           e(1:4) = tmp(1, 1, 1:4)
+           itetra(1) = 0
+           e(1:4) = ei0(1:4,ibnd)
+           call hpsort (4, e, itetra)
            !
            DO ii = 1, 4
-              a(ii,1:4) = ( 0d0 - e(1:4)) / (e(ii) - e(1:4))
+              a(ii,1:4) = ( 0.0_dp - e(1:4)) / (e(ii) - e(1:4))
            END DO
            !
-           IF(e(1) <= 0d0 .AND. 0d0 < e(2)) THEN
+           IF(e(1) <= 0.0_dp .AND. 0.0_dp < e(2)) THEN
               !
               ! A - 1
               !
@@ -777,26 +438,22 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,2) &
-                 &                  + tmp(1:6,1:nbnd,2) * a(2,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1)
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1)
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,2), a(2,1), 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(4, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + v * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(2) <= 0d0 .AND. 0d0 < e(3)) THEN
+           ELSE IF( e(2) <= 0.0_dp .AND. 0.0_dp < e(3)) THEN
               !
               ! B - 1
               !
@@ -804,22 +461,18 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(3, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -829,20 +482,18 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:2) = tmp(1:6,1:nbnd,1:2)
-                 tmp2(1:6,1:nbnd,3)   = tmp(1:6,1:nbnd,2) * a(2,3) &
-                 &                    + tmp(1:6,1:nbnd,3) * a(3,2) 
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -852,26 +503,22 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,2) * a(2,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,2) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(3) <= 0d0 .AND. 0d0 < e(4)) THEN
+           ELSE IF( e(3) <= 0.0_dp .AND. 0.0_dp < e(4)) THEN
               !
               ! C - 1
               !
@@ -879,18 +526,18 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:3) = tmp(1:6,1:nbnd,1:3)
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, 1.0_dp, 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -900,20 +547,18 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:2) = tmp(1:6,1:nbnd,1:2)
-                 tmp2(1:6,1:nbnd,3)   = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,2) 
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -923,76 +568,85 @@ SUBROUTINE dfpt_tetra_calc_beta1()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(4) <= 0d0 ) THEN
+           ELSE IF( e(4) <= 0.0_dp ) THEN
               !
               ! D - 1
               !
-              V = 1d0
-              !             
-              tmp2(1:6,1:nbnd,1:4) = tmp(1:6,1:nbnd,1:4)
+              ei1(1:4) = e(1:4)
+              ej1(1:4,1:nbnd) = ej0(itetra(1:4), 1:nbnd)
               !
-              ei2(            1:4) = tmp2(  1,      1, 1:4)
-              ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-              w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-              ! 
-              CALL dfpt_tetra2_theta(ei2,ej2,w2)
+              CALL dfpt_tetra2_theta(ei1,ej1,w1)
               !
-              w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-              &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+              w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+              &                  + w1(1:nbnd,1:4)
               !
            END IF
            !
-           DO ii = 1, 20
-              !
-              ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-              ikv(1:3) = MODULO(ikv(1:3), (/nk1, nk2, nk3/)) + 1
-              ikk = indx(ikv(1),ikv(2),ikv(3))
-              !
-              beta(1:nbnd,ib,ikk) = beta(1:nbnd,ib,ikk) &
-              &               + MATMUL(wlsm(1:4,ii), w1(1:4,1:nbnd))
-              !               
-           END DO
-           !
         END DO ! ib
         !
-     END DO ! it
+        DO ii = 1, 20
+           !
+           ik = tetra(ii, nt) + nk
+           DO jj = 1, 4
+              beta(1:nbnd,1:nbnd,ik) = beta(1:nbnd,1:nbnd,ik) &
+              &               + wlsm(jj,ii) * w0(1:nbnd,1:nbnd,jj)
+           END DO
+           !
+        END DO
+        !
+     END DO ! nt
      !
-  END DO ! ik
+  END DO ! ns
+  !
+END SUBROUTINE dfpt_tetra_calc_beta1
+!
+!--------------------------------------------------------------------------
+SUBROUTINE dfpt_tetra_average_beta(beta)
+  !--------------------------------------------------------------------------
   !
   ! Average weights of degenerated states
   !
-  DO ik = sttk, lstk
-     DO ib = 1, nbnd
+  USE kinds, ONLY : dp
+  USE wvfct, ONLY : nbnd, et
+  USE klist, ONLY : nks
+  USE qpoint,ONLY : nksq, ikks, ikqs
+  !
+  IMPLICIT NONE
+  !
+  REAL(dp),INTENT(INOUT) :: beta(nbnd,nbnd,nks)
+  !
+  INTEGER :: ibnd, jbnd, kbnd, ik
+  REAL(dp) :: beta2(nbnd)
+  !
+  DO ik = 1, nksq
+     !
+     DO ibnd = 1, nbnd
         !
-        beta2(1:nbnd) = beta(1:nbnd,ib,ik)
+        beta2(1:nbnd) = beta(1:nbnd,ibnd,ikks(ik))
         !
-        DO jb = ib + 1, nbnd
+        DO jbnd = ibnd + 1, nbnd
            !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              beta2(1:nbnd) = beta2(1:nbnd) + beta(1:nbnd,jb,ik)
+           IF(ABS(et(ibnd,ikks(ik)) - et(jbnd,ikks(ik))) < 1e-6_dp) THEN
+              beta2(1:nbnd) = beta2(1:nbnd) + beta(1:nbnd,jbnd,ikks(ik))
            ELSE
               !
-              DO kb = ib, jb - 1
-                 beta(1:nbnd,kb,ik) = beta2(1:nbnd) / real(jb - ib, dp)
+              DO kbnd = ibnd, jbnd - 1
+                 beta(1:nbnd,kbnd,ikks(ik)) = beta2(1:nbnd) / real(jbnd - ibnd, dp)
               END DO
               !
               EXIT
@@ -1000,16 +654,16 @@ SUBROUTINE dfpt_tetra_calc_beta1()
            !
         END DO
         !
-        beta2(1:nbnd) = beta(ib,1:nbnd,ik)
+        beta2(1:nbnd) = beta(ibnd,1:nbnd,ikks(ik))
         !
-        DO jb = ib + 1, nbnd
+        DO jbnd = ibnd + 1, nbnd
            !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              beta2(1:nbnd) = beta2(1:nbnd) + beta(jb,1:nbnd,ik)
+           IF(ABS(et(ibnd,ikqs(ik)) - et(jbnd,ikqs(ik))) < 1e-6_dp) THEN
+              beta2(1:nbnd) = beta2(1:nbnd) + beta(jbnd,1:nbnd,ikks(ik))
            ELSE
               !
-              DO kb = ib, jb - 1
-                 beta(kb,1:nbnd,ik) = beta2(1:nbnd) / real(jb - ib, dp)
+              DO kbnd = ibnd, jbnd - 1
+                 beta(kbnd,1:nbnd,ikks(ik)) = beta2(1:nbnd) / real(jbnd - ibnd, dp)
               END DO
               !
               EXIT
@@ -1020,103 +674,76 @@ SUBROUTINE dfpt_tetra_calc_beta1()
      END DO
   END DO
   !
-  DEALLOCATE(w0)
-  !
-END SUBROUTINE dfpt_tetra_calc_beta1
-!
-!----------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_sort(n1,n2,a)
-  !----------------------------------------------------------------------------
-  !
-  ! Simple sort
-  !
-  USE kinds, ONLY : dp
-  IMPLICIT NONE
-  !
-  INTEGER,INTENT(IN) :: n1, n2
-  REAL(dp),INTENT(INOUT) :: a(n1,n2) 
-  !
-  INTEGER :: i, m
-  REAL(dp) :: am, atmp(n1)
-  !
-  DO i = 1, n2 - 1
-     am = MINVAL(a(1,i+1:n2) )
-     m  = MINLOC(a(1,i+1:n2),1) + i
-     IF(a(1,i) > am) THEN
-        atmp(1:n1) = a(1:n1,m)
-        a(1:n1,m) = a(1:n1,i)
-        a(1:n1,i) = atmp(1:n1)
-     END IF
-  END DO
-  !
-END SUBROUTINE dfpt_tetra_sort
+END SUBROUTINE dfpt_tetra_average_beta
 !
 !--------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_calc_beta2()
+SUBROUTINE dfpt_tetra_calc_beta2(iq,tfst,tlst,beta)
   !--------------------------------------------------------------------------
   !
   ! This routine compute the second term of (B 28) in PRB 64, 235118 (2001).
   !
   USE kinds, ONLY : dp
-  USE wvfct, ONLY : nbnd
-  USE start_k, ONLY : nk1, nk2, nk3
+  USE wvfct, ONLY : nbnd, et
+  USE ener,  ONLY : ef
+  USE klist, ONLY : nkstot
+  USE ktetra, ONLY : ntetra, tetra
+  USE opt_tetra_mod, ONLY : wlsm
+  USE lsda_mod,   ONLY : nspin
   !
   IMPLICIT NONE
   !
-  INTEGER :: ik, ikk, it, ib, jb, kb, ikv(3), ii
-  REAL(dp) :: thr = 1d-8, V, e(4), a(4,4)
-  REAL(dp) :: ei(nbnd,4), ej(nbnd,4), ei2(4), ej2(nbnd,4)
-  REAL(dp) :: tmp(6,nbnd,4), tmp2(6,nbnd,4)
-  REAL(dp) :: w1(4,nbnd), w2(4,nbnd,4), beta2(nbnd)
-  REAL(dp),ALLOCATABLE :: w0(:,:,:)
+  INTEGER,INTENT(IN) :: iq, tfst, tlst
+  REAL(dp),INTENT(INOUT) :: beta(nbnd,nbnd,nkstot)
   !
-  ALLOCATE(w0(4,nbnd,4))
+  INTEGER :: nspin_lsda, ns, nt, nk, ii, jj, ibnd, itetra(4), ik
+  REAL(dp) :: thr = 1e-8_dp, V, tsmall(4,4), ei0(4,nbnd), ej0(4,nbnd), e(4), &
+  &           ei1(4), ej1(4,nbnd), a(4,4), w0(nbnd,nbnd,4), w1(nbnd,4)
   !
-  w0(1:4,1:nbnd,1:4) = 0d0
-  DO ii = 1, 4
-     w0(ii,1:nbnd,ii) = 1d0
-  END DO
-  tmp(1:6,1:nbnd,1:4) = 0d0
+  IF ( nspin == 2 ) THEN
+     nspin_lsda = 2
+  ELSE
+     nspin_lsda = 1
+  END IF
   !
-  DO ik = sttk, lstk
+  DO ns = 1, nspin_lsda
      !
-     DO it = 1, 6
+     ! nk is used to select k-points with up (ns=1) or down (ns=2) spin
+     !
+     IF (ns == 1) THEN
+        nk = 0
+     ELSE
+        nk = nkstot / 2
+     END IF
+     !
+     DO nt = tfst, tlst
         !
-        ei(1:nbnd, 1:4) = 0d0
-        ej(1:nbnd, 1:4) = 0d0
-        !
+        ei0(1:4,1:nbnd) = 0.0_dp
+        ej0(1:4,1:nbnd) = 0.0_dp
         DO ii = 1, 20
            !
-           ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-           ikv(1:3) = MODULO(ikv(1:3),(/nk1, nk2, nk3/)) + 1
-           ikk = indx(ikv(1),ikv(2),ikv(3))
-           !
-           DO ib = 1, nbnd
+           ik = tetra(ii, nt) + nk
+           DO ibnd = 1, nbnd
               !
-              ei(ib, 1:4) = ei(ib, 1:4) + wlsm(1:4,ii) * eig2(ib, ikk)
-              ej(ib, 1:4) = ej(ib, 1:4) + wlsm(1:4,ii) * eig1(ib, ikk)
+              ei0(1:4, ibnd) = ei0(1:4, ibnd) + wlsm(1:4,ii) * (et(ibnd, ik+iq) - ef)
+              ej0(1:4, ibnd) = ej0(1:4, ibnd) + wlsm(1:4,ii) * (et(ibnd, ik)    - ef)
               !
            END DO
            !
         END DO
         !
-        DO ib = 1, nbnd
+        w0(1:nbnd,1:nbnd,1:4) = 0.0_dp
+        !
+        DO ibnd = 1, nbnd
            !
-           w1(1:4,1:nbnd) = 0d0
-           !
-           tmp(1,        1, 1:4) = ei(         ib, 1:4)
-           tmp(2,   1:nbnd, 1:4) = ej(     1:nbnd, 1:4)
-           tmp(3:6, 1:nbnd, 1:4) = w0(1:4, 1:nbnd, 1:4)
-           !
-           CALL dfpt_tetra_sort(6 * nbnd, 4, tmp)
-           !
-           e(1:4) = tmp(1, 1, 1:4)
+           itetra(1) = 0
+           e(1:4) = ei0(1:4, ibnd)
+           call hpsort (4, e, itetra)
            !
            DO ii = 1, 4
-              a(ii,1:4) = ( 0d0 - e(1:4)) / (e(ii) - e(1:4))
+              a(ii,1:4) = ( 0.0_dp - e(1:4)) / (e(ii) - e(1:4))
            END DO
            !
-           IF(e(1) <= 0d0 .AND. 0d0 < e(2)) THEN
+           IF(e(1) <= 0.0_dp .AND. 0.0_dp < e(2)) THEN
               !
               ! A - 1
               !
@@ -1124,26 +751,22 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,2) &
-                 &                  + tmp(1:6,1:nbnd,2) * a(2,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1)
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1)
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,2), a(2,1), 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(4, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(2) <= 0d0 .AND. 0d0 < e(3)) THEN
+           ELSE IF( e(2) <= 0.0_dp .AND. 0.0_dp < e(3)) THEN
               !
               ! B - 1
               !
@@ -1151,22 +774,18 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(3, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1176,20 +795,18 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:2) = tmp(1:6,1:nbnd,1:2)
-                 tmp2(1:6,1:nbnd,3)   = tmp(1:6,1:nbnd,2) * a(2,3) &
-                 &                    + tmp(1:6,1:nbnd,3) * a(3,2) 
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1199,26 +816,22 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,2) * a(2,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,2) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(3) <= 0d0 .AND. 0d0 < e(4)) THEN
+           ELSE IF( e(3) <= 0.0_dp .AND. 0.0_dp < e(4)) THEN
               !
               ! C - 1
               !
@@ -1226,18 +839,18 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:3) = tmp(1:6,1:nbnd,1:3)
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, 1.0_dp, 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1247,20 +860,18 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:2) = tmp(1:6,1:nbnd,1:2)
-                 tmp2(1:6,1:nbnd,3)   = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,2) 
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1270,173 +881,119 @@ SUBROUTINE dfpt_tetra_calc_beta2()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_theta(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_theta(ei1,ej1,w1)
+                 !
+                 w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+                 &           + V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(4) <= 0d0 ) THEN
+           ELSE IF( e(4) <= 0.0_dp ) THEN
               !
               ! D - 1
               !
-              V = 1d0
-              !             
-              tmp2(1:6,1:nbnd,1:4) = tmp(1:6,1:nbnd,1:4)
+              ei1(1:4) = e(1:4)
+              ej1(1:4,1:nbnd) = ej0(itetra(1:4), 1:nbnd)
               !
-              ei2(            1:4) = tmp2(  1,      1, 1:4)
-              ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-              w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-              ! 
-              CALL dfpt_tetra2_theta(ei2,ej2,w2)
+              CALL dfpt_tetra2_theta(ei1,ej1,w1)
               !
-              w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-              &      + V * SUM(w2(1:4,1:nbnd,1:4), 3)
+              w0(ibnd,1:nbnd,itetra(1:4)) = w0(ibnd,1:nbnd,itetra(1:4)) &
+              &                  + w1(1:nbnd,1:4)
               !
            END IF
-           !
-           DO ii = 1, 20
-              !
-              ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-              ikv(1:3) = MODULO(ikv(1:3), (/nk1, nk2, nk3/)) + 1
-              ikk = indx(ikv(1),ikv(2),ikv(3))
-              !
-              beta(ib,1:nbnd,ikk) = beta(ib,1:nbnd,ikk) &
-              &                + MATMUL(wlsm(1:4,ii), w1(1:4,1:nbnd))
-              !               
-           END DO
            !
         END DO ! ib
         !
-     END DO ! it
+        DO ii = 1, 20
+           !
+           ik = tetra(ii, nt) + nk
+           DO jj = 1, 4
+              beta(1:nbnd,1:nbnd,ik) = beta(1:nbnd,1:nbnd,ik) &
+              &               + wlsm(jj,ii) * w0(1:nbnd,1:nbnd,jj)
+           END DO
+           !
+        END DO
+        !
+     END DO ! nt
      !
-  END DO ! ik
-  !
-  ! Average weights of degenerated states
-  !
-  DO ik = sttk, lstk
-     DO ib = 1, nbnd
-        !
-        beta2(1:nbnd) = beta(1:nbnd,ib,ik)
-        !
-        DO jb = ib + 1, nbnd
-           !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              beta2(1:nbnd) = beta2(1:nbnd) + beta(1:nbnd,jb,ik)
-           ELSE
-              !
-              DO kb = ib, jb - 1
-                 beta(1:nbnd,kb,ik) = beta2(1:nbnd) / real(jb - ib, dp)
-              END DO
-              !
-              EXIT
-           END IF
-           !
-        END DO
-        !
-        beta2(1:nbnd) = beta(ib,1:nbnd,ik)
-        !
-        DO jb = ib + 1, nbnd
-           !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              beta2(1:nbnd) = beta2(1:nbnd) + beta(jb,1:nbnd,ik)
-           ELSE
-              !
-              DO kb = ib, jb - 1
-                 beta(kb,1:nbnd,ik) = beta2(1:nbnd) / real(jb - ib, dp)
-              END DO
-              !
-              EXIT
-           END IF
-           !
-        END DO
-        !
-     END DO
-  END DO
-  !
-  DEALLOCATE(w0)
+  END DO ! ns
   !
 END SUBROUTINE dfpt_tetra_calc_beta2
 !
 !----------------------------------------------------------------------------
-SUBROUTINE dfpt_tetra_calc_beta3()
+SUBROUTINE dfpt_tetra_calc_beta3(iq,tfst,tlst,beta)
   !--------------------------------------------------------------------------
   !
   ! This routine compute the third term of (B 28) in PRB 64, 235118 (2001).
   !
   USE kinds, ONLY : dp
-  USE wvfct, ONLY : nbnd
-  USE start_k, ONLY : nk1, nk2, nk3
+  USE wvfct, ONLY : nbnd, et
+  USE ener,  ONLY : ef
+  USE klist, ONLY : nkstot
+  USE ktetra, ONLY : ntetra, tetra
+  USE opt_tetra_mod, ONLY : wlsm
+  USE lsda_mod,   ONLY : nspin
   !
   IMPLICIT NONE
   !
-  INTEGER :: ik, it, ib, jb, kb, ikv(3), ii, ikk
-  REAL(dp) :: thr = 1d-8, V, e(4), a(4,4)
-  REAL(dp) :: ei(nbnd,4), ej(nbnd,4), ei2(4), ej2(nbnd,4)
-  REAL(dp) :: tmp(6,nbnd,4), tmp2(6,nbnd,4)
-  REAL(dp) :: w1(4,nbnd), w2(4,nbnd,4), beta2(nbnd)
-  REAL(dp),ALLOCATABLE :: w0(:,:,:)
+  INTEGER,INTENT(IN) :: iq, tfst, tlst
+  REAL(dp),INTENT(INOUT) :: beta(nbnd,nbnd,nkstot)
   !
-  ALLOCATE(w0(4,nbnd,4))
+  INTEGER :: nspin_lsda, ns, nt, nk, ii, jj, ibnd, itetra(4), ik
+  REAL(dp) :: thr = 1e-8_dp, V, tsmall(4,4), ei0(4,nbnd), ej0(4,nbnd), e(4), &
+  &           ei1(4), ej1(4,nbnd), a(4,4), w0(nbnd,nbnd,4), w1(nbnd,4)
   !
-  w0(1:4,1:nbnd,1:4) = 0d0
-  DO ii = 1, 4
-     w0(ii,1:nbnd,ii) = 1d0
-  END DO
-  tmp(1:6,1:nbnd,1:4) = 0d0
+  IF ( nspin == 2 ) THEN
+     nspin_lsda = 2
+  ELSE
+     nspin_lsda = 1
+  END IF
   !
-  DO ik = sttk, lstk
+  DO ns = 1, nspin_lsda
      !
-     DO it = 1, 6
+     ! nk is used to select k-points with up (ns=1) or down (ns=2) spin
+     !
+     IF (ns == 1) THEN
+        nk = 0
+     ELSE
+        nk = nkstot / 2
+     END IF
+     !
+     DO nt = tfst, tlst
         !
-        ei(1:nbnd, 1:4) = 0d0
-        ej(1:nbnd, 1:4) = 0d0
-        !
+        ei0(1:4, 1:nbnd) = 0.0_dp
+        ej0(1:4, 1:nbnd) = 0.0_dp
         DO ii = 1, 20
            !
-           ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-           ikv(1:3) = MODULO(ikv(1:3),(/nk1, nk2, nk3/)) + 1
-           ikk = indx(ikv(1),ikv(2),ikv(3))
-           !
-           DO ib = 1, nbnd
-              !
-              ei(ib, 1:4) = ei(ib, 1:4) + wlsm(1:4,ii) * eig1(ib, ikk)
-              ej(ib, 1:4) = ej(ib, 1:4) + wlsm(1:4,ii) * eig2(ib, ikk)
-              !               
+           ik = tetra(ii, nt) + nk
+           DO ibnd = 1, nbnd
+              ei0(1:4, ibnd) = ei0(1:4, ibnd) + wlsm(1:4,ii) * (et(ibnd, ik)    - ef)
+              ej0(1:4, ibnd) = ej0(1:4, ibnd) + wlsm(1:4,ii) * (et(ibnd, ik+iq) - ef)
            END DO
            !
         END DO
         !
-        DO ib = 1, nbnd
+        w0(1:nbnd,1:nbnd,1:4) = 0.0_dp
+        !
+        DO ibnd = 1, nbnd
            !
-           w1(1:4,1:nbnd) = 0d0
-           !
-           tmp(1,        1, 1:4) = ei(         ib, 1:4)
-           tmp(2,   1:nbnd, 1:4) = ej(     1:nbnd, 1:4)
-           tmp(3:6, 1:nbnd, 1:4) = w0(1:4, 1:nbnd, 1:4)
-           !
-           CALL dfpt_tetra_sort(6 * nbnd, 4, tmp)
-           !
-           e(1:4) = tmp(1, 1, 1:4)
+           itetra(1) = 0
+           e(1:4) = ei0(1:4, ibnd)
+           call hpsort (4, e, itetra)
            !
            DO ii = 1, 4
-              a(ii,1:4) = (0d0 - e(1:4)) / (e(ii) - e(1:4))
+              a(ii,1:4) = ( 0.0_dp - e(1:4)) / (e(ii) - e(1:4))
            END DO
            !
-           IF(e(1) <= 0d0 .AND. 0d0 < e(2)) THEN
+           IF(e(1) <= 0.0_dp .AND. 0.0_dp < e(2)) THEN
               !
               ! A - 1
               !
@@ -1444,26 +1001,22 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,2) &
-                 &                  + tmp(1:6,1:nbnd,2) * a(2,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1)
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1)
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,2), a(2,1), 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(4, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(2) <= 0d0 .AND. 0d0 < e(3)) THEN
+           ELSE IF( e(2) <= 0.0_dp .AND. 0.0_dp < e(3)) THEN
               !
               ! B - 1
               !
@@ -1471,22 +1024,18 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(3, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1496,20 +1045,18 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:2) = tmp(1:6,1:nbnd,1:2)
-                 tmp2(1:6,1:nbnd,3)   = tmp(1:6,1:nbnd,2) * a(2,3) &
-                 &                    + tmp(1:6,1:nbnd,3) * a(3,2) 
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1519,26 +1066,22 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,2) * a(2,3) &
-                 &                  + tmp(1:6,1:nbnd,3) * a(3,2) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(3) <= 0d0 .AND. 0d0 < e(4)) THEN
+           ELSE IF( e(3) <= 0.0_dp .AND. 0.0_dp < e(4)) THEN
               !
               ! C - 1
               !
@@ -1546,18 +1089,18 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:3) = tmp(1:6,1:nbnd,1:3)
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, 1.0_dp, 0.0_dp/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1567,20 +1110,18 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1:2) = tmp(1:6,1:nbnd,1:2)
-                 tmp2(1:6,1:nbnd,3)   = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,2) 
-                 tmp2(1:6,1:nbnd,4)   = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                    + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
@@ -1590,109 +1131,55 @@ SUBROUTINE dfpt_tetra_calc_beta3()
               !
               IF(V > thr) THEN
                  !
-                 tmp2(1:6,1:nbnd,1) = tmp(1:6,1:nbnd,1)
-                 tmp2(1:6,1:nbnd,2) = tmp(1:6,1:nbnd,1) * a(1,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,1) 
-                 tmp2(1:6,1:nbnd,3) = tmp(1:6,1:nbnd,2) * a(2,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,2) 
-                 tmp2(1:6,1:nbnd,4) = tmp(1:6,1:nbnd,3) * a(3,4) &
-                 &                  + tmp(1:6,1:nbnd,4) * a(4,3) 
+                 tsmall(1, 1:4) = (/1.0_dp, 0.0_dp, 0.0_dp, 0.0_dp/)
+                 tsmall(2, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+                 tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+                 tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
                  !
-                 ei2(            1:4) = tmp2(  1,      1, 1:4)
-                 ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-                 w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-                 ! 
-                 CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+                 ei1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+                 ej1(1:4,1:nbnd) = MATMUL(tsmall(1:4,1:4), ej0(itetra(1:4), 1:nbnd))
                  !
-                 w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-                 &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+                 CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
+                 !
+                 w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+                 &           - V * MATMUL(w1(1:nbnd,1:4), tsmall(1:4,1:4))
                  !
               END IF
               !
-           ELSE IF( e(4) <= 0d0 ) THEN
+           ELSE IF( e(4) <= 0.0_dp ) THEN
               !
               ! D - 1
               !
-              V = 1d0
-              !             
-              tmp2(1:6,1:nbnd,1:4) = tmp(1:6,1:nbnd,1:4)
+              ei1(1:4) = e(1:4)
+              ej1(1:4,1:nbnd) = ej0(itetra(1:4), 1:nbnd)
               !
-              ei2(            1:4) = tmp2(  1,      1, 1:4)
-              ej2(    1:nbnd, 1:4) = tmp2(  2, 1:nbnd, 1:4)
-              w2(1:4, 1:nbnd, 1:4) = tmp2(3:6, 1:nbnd, 1:4)
-              ! 
-              CALL dfpt_tetra2_lindhard(ei2,ej2,w2)
+              CALL dfpt_tetra2_lindhard(ei1,ej1,w1)
               !
-              w1(1:4,1:nbnd) = w1(1:4,1:nbnd) &
-              &      - V * SUM(w2(1:4,1:nbnd,1:4), 3)
+              w0(1:nbnd,ibnd,itetra(1:4)) = w0(1:nbnd,ibnd,itetra(1:4)) &
+              &                  - w1(1:nbnd,1:4)
               !
            END IF
            !
-           DO ii = 1, 20
-              !
-              ikv(1:3) = grid(1:3,ik) + ivvec(1:3,ii,it)
-              ikv(1:3) = MODULO(ikv(1:3), (/nk1, nk2, nk3/)) + 1
-              ikk = indx(ikv(1),ikv(2),ikv(3))
-              !
-              beta(1:nbnd,ib,ikk) = beta(1:nbnd,ib,ikk) &
-              &                   + MATMUL(wlsm(1:4,ii), w1(1:4,1:nbnd))
-              !               
+        END DO ! ib
+        !
+        DO ii = 1, 20
+           !
+           ik = tetra(ii, nt) + nk
+           DO jj = 1, 4
+              beta(1:nbnd,1:nbnd,ik) = beta(1:nbnd,1:nbnd,ik) &
+              &               + wlsm(jj,ii) * w0(1:nbnd,1:nbnd,jj)
            END DO
            !
-        END DO ! ib
+        END DO
         !
      END DO ! it
      !
   END DO ! ik
   !
-  ! Average weights of degenerated states
-  !
-  DO ik = sttk, lstk
-     DO ib = 1, nbnd
-        !
-        beta2(1:nbnd) = beta(1:nbnd,ib,ik)
-        !
-        DO jb = ib + 1, nbnd
-           !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              beta2(1:nbnd) = beta2(1:nbnd) + beta(1:nbnd,jb,ik)
-           ELSE
-              !
-              DO kb = ib, jb - 1
-                 beta(1:nbnd,kb,ik) = beta2(1:nbnd) / real(jb - ib, dp)
-              END DO
-              !
-              EXIT
-           END IF
-           !
-        END DO
-        !
-        beta2(1:nbnd) = beta(ib,1:nbnd,ik)
-        !
-        DO jb = ib + 1, nbnd
-           !
-           IF(ABS(eig1(ib,ik) - eig1(jb,ik)) < 1e-6_dp) THEN
-              beta2(1:nbnd) = beta2(1:nbnd) + beta(jb,1:nbnd,ik)
-           ELSE
-              !
-              DO kb = ib, jb - 1
-                 beta(kb,1:nbnd,ik) = beta2(1:nbnd) / real(jb - ib, dp)
-              END DO
-              !
-              EXIT
-           END IF
-           !
-        END DO
-        !
-     END DO
-  END DO
-  !
-  DEALLOCATE(w0)
-  !
 END SUBROUTINE dfpt_tetra_calc_beta3
 !
 !-----------------------------------------------------------
-SUBROUTINE dfpt_tetra2_theta(ei,ej,w)
+SUBROUTINE dfpt_tetra2_theta(ei0,ej0,w0)
   !
   ! This routine compute theta(ei - ej)
   !
@@ -1701,151 +1188,65 @@ SUBROUTINE dfpt_tetra2_theta(ei,ej,w)
   !
   IMPLICIT NONE
   !
-  REAL(dp),INTENT(IN) :: ei(4), ej(nbnd,4)
-  REAL(dp),INTENT(INOUT) :: w(4,nbnd,4)
+  REAL(dp),INTENT(IN) :: ei0(4), ej0(4,nbnd)
+  REAL(dp),INTENT(OUT) :: w0(nbnd,4)
   !
-  INTEGER :: ii, ib
-  REAL(dp) :: V, w2(4,4), thr = 1d-8
-  REAL(dp) :: tmp(5,4), e(4), a(4,4)
+  INTEGER :: ii, ibnd, itetra(4)
+  REAL(dp) :: C(3), e(4), a(4,4), thr = 1.0e-8_dp
   !
-  DO ib = 1, nbnd
+  w0(1:nbnd,1:4) = 0.0_dp
+  !
+  DO ibnd = 1, nbnd
      !
-     tmp(  1,1:4) = ej(ib,1:4) - ei(1:4)
-     tmp(2:5,1:4) = w(1:4,ib,1:4)
-     CALL dfpt_tetra_sort(5, 4, tmp)
-     e(       1:4) = tmp(1,1:4)
-     w(1:4,ib,1:4) = 0d0
+     e(1:4) = ej0(1:4,ibnd) - ei0(1:4)
+     itetra(1) = 0
+     call hpsort (4, e, itetra)
      !
      DO ii = 1, 4
-        a(ii,1:4) = (0d0 - e(1:4)) / (e(ii) - e(1:4))
+        a(ii,1:4) = (0_dp - e(1:4)) / (e(ii) - e(1:4))
      END DO
      !
      IF(ABS(e(1)) < thr .AND. ABS(e(4)) < thr) THEN
         !
         ! Theta(0) = 0.5
         !
-        V = 0.5_dp * 0.25_dp
+        w0(ibnd,1:4) = 0.5_dp * 0.25_dp
         !
-        w2(1:4,1:4) = tmp(2:5, 1:4)
+     ELSE IF((e(1) <= 0.0_dp .AND. 0.0_dp < e(2)) .OR. (e(1) < 0.0_dp .AND. 0.0_dp <= e(2))) THEN
         !
-        w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
+        C(1) = a(2,1) * a(3,1) * a(4,1) * 0.25_dp
+        w0(ibnd,itetra(1)) = C(1) * (1.0_dp + a(1,2) + a(1,3) + a(1,4))
+        w0(ibnd,itetra(2)) = C(1) * a(2,1)
+        w0(ibnd,itetra(3)) = C(1) * a(3,1)
+        w0(ibnd,itetra(4)) = C(1) * a(4,1)
         !
-     ELSE IF((e(1) <= 0d0 .AND. 0d0 < e(2)) .OR. (e(1) < 0d0 .AND. 0d0 <= e(2))) THEN
+     ELSE IF((e(2) <= 0.0_dp .AND. 0.0_dp < e(3)) .OR. (e(2) < 0.0_dp .AND. 0.0_dp <= e(3))) THEN
         !
-        ! A - 1
+        C(1) = a(4,1) * a(3,1) * 0.25_dp
+        C(2) = a(4,1) * a(3,2) * a(1,3) * 0.25_dp
+        C(3) = a(4,2) * a(3,2) * a(1,4) * 0.25_dp
         !
-        V = 0.25d0 * a(2,1) * a(3,1) * a(4,1)
+        w0(ibnd,itetra(1)) = C(1) + (C(1) + C(2)) * a(1,3) + (C(1) + C(2) + C(3)) * a(1,4)
+        w0(ibnd,itetra(2)) = C(1) + C(2) + C(3) + (C(2) + C(3)) * a(2,3) + C(3) * a(2,4)
+        w0(ibnd,itetra(3)) = (C(1) + C(2)) * a(3,1) + (C(2) + C(3)) * a(3,2)
+        w0(ibnd,itetra(4)) = (C(1) + C(2) + C(3)) * a(4,1) + C(3) * a(4,2)
         !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1) = tmp(2:5,1)
-           w2(1:4,2) = tmp(2:5,1) * a(1,2) + tmp(2:5,2) * a(2,1) 
-           w2(1:4,3) = tmp(2:5,1) * a(1,3) + tmp(2:5,3) * a(3,1)
-           w2(1:4,4) = tmp(2:5,1) * a(1,4) + tmp(2:5,4) * a(4,1)
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
+     ELSE IF((e(3) <= 0.0_dp .AND. 0.0_dp < e(4)) .OR. (e(3) < 0.0_dp .AND. 0.0_dp <= e(4))) THEN
         !
-     ELSE IF((e(2) <= 0d0 .AND. 0d0 < e(3)) .OR. (e(2) < 0d0 .AND. 0d0 <= e(3))) THEN
+        C(1) = a(1,4) * a(2,4) * a(3,4)
         !
-        ! B - 1
+        w0(ibnd,itetra(1)) = 1.0_dp - C(1) * a(1,4)
+        w0(ibnd,itetra(2)) = 1.0_dp - C(1) * a(2,4)
+        w0(ibnd,itetra(3)) = 1.0_dp - C(1) * a(3,4)
+        w0(ibnd,itetra(4)) = 1.0_dp - C(1) * (1.0_dp + a(4,1) + a(4,2) + a(4,3))
         !
-        V = 0.25d0 * a(3,1) * a(4,1) * a(2,4)
+        w0(ibnd,1:4) = w0(ibnd,1:4) * 0.25_dp
         !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1) = tmp(2:5,1)
-           w2(1:4,2) = tmp(2:5,1) * a(1,3) + tmp(2:5,3) * a(3,1) 
-           w2(1:4,3) = tmp(2:5,1) * a(1,4) + tmp(2:5,4) * a(4,1) 
-           w2(1:4,4) = tmp(2:5,2) * a(2,4) + tmp(2:5,4) * a(4,2) 
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
-        !
-        ! B - 2
-        !
-        V = 0.25d0 * a(3,2) * a(4,2)
-        !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1:2) = tmp(2:5,1:2)
-           w2(1:4,3)   = tmp(2:5,2) * a(2,3) + tmp(2:5,3) * a(3,2) 
-           w2(1:4,4)   = tmp(2:5,2) * a(2,4) + tmp(2:5,4) * a(4,2) 
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
-        !
-        ! B - 3
-        !
-        V = 0.25d0 * a(2,3) * a(3,1) * a(4,2)
-        !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1) = tmp(2:5,1)
-           w2(1:4,2) = tmp(2:5,1) * a(1,3) + tmp(2:5,3) * a(3,1) 
-           w2(1:4,3) = tmp(2:5,2) * a(2,3) + tmp(2:5,3) * a(3,2) 
-           w2(1:4,4) = tmp(2:5,2) * a(2,4) + tmp(2:5,4) * a(4,2) 
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
-        !
-     ELSE IF((e(3) <= 0d0 .AND. 0d0 < e(4)) .OR. (e(3) < 0d0 .AND. 0d0 <= e(4))) THEN
-        !
-        ! C - 1
-        !
-        V = 0.25d0 * a(4,3)
-        !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1:3) = tmp(2:5,1:3)
-           w2(1:4,4)   = tmp(2:5,3) * a(3,4) + tmp(2:5,4) * a(4,3) 
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
-        !
-        ! C - 2
-        !
-        V = 0.25d0 * a(3,4) * a(4,2)
-        !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1:2) = tmp(2:5,1:2)
-           w2(1:4,3)   = tmp(2:5,2) * a(2,4) + tmp(2:5,4) * a(4,2) 
-           w2(1:4,4)   = tmp(2:5,3) * a(3,4) + tmp(2:5,4) * a(4,3) 
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
-        !
-        ! C - 3
-        !
-        V = 0.25d0 * a(3,4) * a(2,4) * a(4,1)
-        !
-        IF(V > thr) THEN
-           !
-           w2(1:4,1) = tmp(2:5,1)
-           w2(1:4,2) = tmp(2:5,1) * a(1,4) + tmp(2:5,4) * a(4,1) 
-           w2(1:4,3) = tmp(2:5,2) * a(2,4) + tmp(2:5,4) * a(4,2) 
-           w2(1:4,4) = tmp(2:5,3) * a(3,4) + tmp(2:5,4) * a(4,3) 
-           !
-           w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
-           !
-        END IF
-        !
-     ELSE IF(e(4) <= 0d0) THEN
+     ELSE IF(e(4) <= 0.0_dp) THEN
         !
         ! D - 1
         !
-        V = 0.25d0
-        !             
-        w2(1:4,1:4) = tmp(2:5,1:4)
-        !
-        w(1:4, ib,1:4) = w(1:4, ib, 1:4) + w2(1:4, 1:4) * V
+        w0(ibnd,1:4) = 0.25_dp
         !
      END IF
      !
@@ -1854,7 +1255,7 @@ SUBROUTINE dfpt_tetra2_theta(ei,ej,w)
 END SUBROUTINE dfpt_tetra2_theta
 !
 !-----------------------------------------------------------------------
-SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
+SUBROUTINE dfpt_tetra2_lindhard(ei0,ej0,w0)
   !---------------------------------------------------------------------
   !
   ! This routine take the unoccupied region.
@@ -1864,42 +1265,37 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
   !
   IMPLICIT NONE
   !
-  REAL(dp),INTENT(IN) :: ei(4), ej(nbnd,4)
-  REAL(dp),INTENT(INOUT) :: w(4,nbnd,4)
+  REAL(dp),INTENT(IN) :: ei0(4), ej0(4,nbnd)
+  REAL(dp),INTENT(OUT) :: w0(nbnd,4)
   !
-  INTEGER :: ii, ib
-  REAL(dp) :: V, ei2(4), ej2(4), w2(4,4), thr = 1d-8
-  REAL(dp) :: tmp(6,4), tmp2(6,4), e(4), a(4,4)
+  INTEGER :: ii, ibnd, itetra(4)
+  REAL(dp) :: V, ei1(4), ej1(4), w1(4), thr = 1e-8_dp
+  REAL(dp) :: e(4), a(4,4), tsmall(4,4)
   !
-  DO ib = 1, nbnd
+  w0(1:nbnd,1:4) = 0.0_dp
+  !
+  DO ibnd = 1, nbnd
      !
-     tmp(  1, 1:4) = ej(ib,   1:4)
-     tmp(  2, 1:4) = ei(      1:4)
-     tmp(3:6, 1:4) = w(1:4,ib,1:4)
-     CALL dfpt_tetra_sort(6, 4, tmp)
-     e(       1:4) = tmp(1,1:4)
-     w(1:4,ib,1:4) = 0d0
+     e(1:4) = ej0(1:4,ibnd)
+     itetra(1) = 0
+     call hpsort (4, e, itetra)
      !
      DO ii = 1, 4
-        a(ii,1:4) = ( 0d0 - e(1:4) ) / (e(ii) - e(1:4))
+        a(ii,1:4) = ( 0.0_dp - e(1:4) ) / (e(ii) - e(1:4))
      END DO
      !
-     IF(0d0 <= e(1)) THEN
+     IF(0_dp <= e(1)) THEN
         !
         ! A - 1
         !
-        V = 1d0
+        ej1(1:4) = e(1:4)
+        ei1(1:4) = ei0(itetra(1:4))
         !
-        tmp2(1:6,1:4) = tmp(1:6,1:4)
+        CALL dfpt_tetra_lindhard(ei1,ej1,w1)
         !
-        ej2(   1:4) = tmp2(  1,1:4)
-        ei2(   1:4) = tmp2(  2,1:4)
-        w2(1:4,1:4) = tmp2(3:6,1:4)
+        w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) + w1(1:4)
         !
-        CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-        w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
-        !
-     ELSE IF((e(1) < 0d0 .AND. 0d0 <= e(2)) .OR. (e(1) <= 0d0 .AND. 0d0 < e(2))) THEN
+     ELSE IF((e(1) < 0.0_dp .AND. 0.0_dp <= e(2)) .OR. (e(1) <= 0.0_dp .AND. 0.0_dp < e(2))) THEN
         !
         ! B - 1
         !
@@ -1907,15 +1303,18 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !
         IF(V > thr) THEN
            !
-           tmp2(1:6,1)   = tmp(1:6,1) * a(1,2) + tmp(1:6,2) * a(2,1)
-           tmp2(1:6,2:4) = tmp(1:6,2:4)
+           tsmall(1, 1:4) = (/a(1,2), a(2,1), 0.0_dp, 0.0_dp/)
+           tsmall(2, 1:4) = (/0.0_dp, 1.0_dp, 0.0_dp, 0.0_dp/)
+           tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, 1.0_dp, 0.0_dp/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           ej2(   1:4) = tmp2(1,  1:4)
-           ei2(   1:4) = tmp2(2,  1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
            !       
         END IF
         !
@@ -1925,17 +1324,19 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !
         IF(V > thr) THEN
            !
-           tmp2(1:6,1) = tmp(1:6,1) * a(1,2) + tmp(1:6,2) * a(2,1)
-           tmp2(1:6,2) = tmp(1:6,1) * a(1,3) + tmp(1:6,3) * a(3,1)
-           tmp2(1:6,3:4) = tmp(1:6,3:4)
+           tsmall(1, 1:4) = (/a(1,2), a(2,1), 0.0_dp, 0.0_dp/)
+           tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+           tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, 1.0_dp, 0.0_dp/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           ej2(   1:4) = tmp2(  1,1:4)
-           ei2(   1:4) = tmp2(  2,1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
-           !         
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
+           !
         END IF
         !
         ! B - 3
@@ -1944,21 +1345,22 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !
         IF(V > thr) THEN
            !
-           tmp2(1:6,1) = tmp(1:6,1) * a(1,2) + tmp(1:6,2) * a(2,1)
-           tmp2(1:6,2) = tmp(1:6,1) * a(1,3) + tmp(1:6,3) * a(3,1)
-           tmp2(1:6,3) = tmp(1:6,1) * a(1,4) + tmp(1:6,4) * a(4,1)
-           tmp2(1:6,4) = tmp(1:6,4)
+           tsmall(1, 1:4) = (/a(1,2), a(2,1), 0.0_dp, 0.0_dp/)
+           tsmall(2, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+           tsmall(3, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           ej2(   1:4) = tmp2(  1,1:4)
-           ei2(   1:4) = tmp2(  2,1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
            !       
         END IF
         !          
-     ELSE IF((e(2) < 0d0 .AND. 0d0 <= e(3)) .OR. (e(2) <= 0d0 .AND. 0d0 < e(3))) THEN
+     ELSE IF((e(2) < 0.0_dp .AND. 0.0_dp <= e(3)) .OR. (e(2) <= 0.0_dp .AND. 0.0_dp < e(3))) THEN
         !          
         ! C - 1
         !
@@ -1966,17 +1368,18 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !
         IF(V > thr) THEN
            !
-           tmp2(1:6,1) = tmp(1:6,1) * a(1,3) + tmp(1:6,3) * a(3,1)
-           tmp2(1:6,2) = tmp(1:6,1) * a(1,4) + tmp(1:6,4) * a(4,1)
-           tmp2(1:6,3) = tmp(1:6,2) * a(2,4) + tmp(1:6,4) * a(4,2)
-           tmp2(1:6,4) = tmp(1:6,4)
+           tsmall(1, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+           tsmall(2, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+           tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           ej2(   1:4) = tmp2(  1,1:4)
-           ei2(   1:4) = tmp2(  2,1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
            !      
         END IF
         !
@@ -1986,16 +1389,18 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !
         IF(V > thr) THEN
            !
-           tmp2(1:6,1) = tmp(1:6,1) * a(1,3) + tmp(1:6,3) * a(3,1)
-           tmp2(1:6,2) = tmp(1:6,2) * a(2,3) + tmp(1:6,3) * a(3,2)
-           tmp2(1:6,3:4) = tmp(1:6,3:4)
+           tsmall(1, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+           tsmall(2, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+           tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, 1.0_dp, 0.0_dp/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           ej2(   1:4) = tmp2(  1,1:4)
-           ei2(   1:4) = tmp2(  2,1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
            !
         END IF
         !
@@ -2005,21 +1410,22 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !
         IF(V > thr) THEN
            !
-           tmp2(1:6,1) = tmp(1:6,1) * a(1,3) + tmp(1:6,3) * a(3,1)
-           tmp2(1:6,2) = tmp(1:6,2) * a(2,3) + tmp(1:6,3) * a(3,2)
-           tmp2(1:6,3) = tmp(1:6,2) * a(2,4) + tmp(1:6,4) * a(4,2)
-           tmp2(1:6,4) = tmp(1:6,4)
+           tsmall(1, 1:4) = (/a(1,3), 0.0_dp, a(3,1), 0.0_dp/)
+           tsmall(2, 1:4) = (/0.0_dp, a(2,3), a(3,2), 0.0_dp/)
+           tsmall(3, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           ej2(   1:4) = tmp2(  1,1:4)
-           ei2(   1:4) = tmp2(  2,1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
            !
         END IF
         !          
-     ELSE IF((e(3) < 0d0 .AND. 0d0 <= e(4)) .OR. (e(3) <= 0d0 .AND. 0d0 < e(4))) THEN
+     ELSE IF((e(3) < 0.0_dp .AND. 0.0_dp <= e(4)) .OR. (e(3) <= 0.0_dp .AND. 0.0_dp < e(4))) THEN
         !
         ! D - 1
         !
@@ -2027,17 +1433,18 @@ SUBROUTINE dfpt_tetra2_lindhard(ei,ej,w)
         !          
         IF(V > thr) THEN
            !
-           tmp2(1:6,1) = tmp(1:6,1) * a(1,4) + tmp(1:6,4) * a(4,1)
-           tmp2(1:6,2) = tmp(1:6,2) * a(2,4) + tmp(1:6,4) * a(4,2)
-           tmp2(1:6,3) = tmp(1:6,3) * a(3,4) + tmp(1:6,4) * a(4,3)
-           tmp2(1:6,4) = tmp(1:6,4)
-           !          
-           ej2(   1:4) = tmp2(  1,1:4)
-           ei2(   1:4) = tmp2(  2,1:4)
-           w2(1:4,1:4) = tmp2(3:6,1:4)
+           tsmall(1, 1:4) = (/a(1,4), 0.0_dp, 0.0_dp, a(4,1)/)
+           tsmall(2, 1:4) = (/0.0_dp, a(2,4), 0.0_dp, a(4,2)/)
+           tsmall(3, 1:4) = (/0.0_dp, 0.0_dp, a(3,4), a(4,3)/)
+           tsmall(4, 1:4) = (/0.0_dp, 0.0_dp, 0.0_dp, 1.0_dp/)
            !
-           CALL dfpt_tetra_lindhard(ei2,ej2,w2)
-           w(1:4,ib,1:4) = w(1:4,ib,1:4) + w2(1:4,1:4) * V
+           ej1(1:4) = MATMUL(tsmall(1:4,1:4), e(1:4))
+           ei1(1:4) = MATMUL(tsmall(1:4,1:4), ei0(itetra(1:4)))
+           !
+           CALL dfpt_tetra_lindhard(ei1,ej1,w1)
+           !
+           w0(ibnd,itetra(1:4)) = w0(ibnd,itetra(1:4)) &
+           &                   + V * MATMUL(w1(1:4), tsmall(1:4,1:4))
            !        
         END IF
         !
@@ -2058,134 +1465,134 @@ SUBROUTINE dfpt_tetra_lindhard(ei,ej,w)
   IMPLICIT NONE
   !
   REAL(dp),INTENT(IN) :: ei(4), ej(4)
-  REAL(dp),INTENT(INOUT) :: w(4,4)
+  REAL(dp),INTENT(OUT) :: w(4)
   !
-  INTEGER :: ii
-  REAL(dp) :: tmp(5,4), w2(4), de(4), lnd(4), thr, thr2
+  INTEGER :: ii, itetra(4)
+  REAL(dp) :: e(4), le(4), thr, thr2
   !
-  tmp( 1, 1:4) = ej(1:4) - ei(1:4)
-  tmp(2:5,1:4) = w(1:4,1:4)
-  CALL dfpt_tetra_sort(5, 4, tmp)
-  de(   1:4) = tmp(  1,1:4)
-  w(1:4,1:4) = tmp(2:5,1:4)
+  w(1:4) = 0.0_dp
   !
-  thr = MAXVAL(de(1:4)) * 1d-3
-  thr2 = 1d-8
+  itetra(1) = 0
+  e(1:4) = ej(1:4) - ei(1:4)
+  call hpsort (4, e, itetra)
+  !
+  thr = MAXVAL(e(1:4)) * 1e-3_dp
+  thr2 = 1e-8_dp
   !
   DO ii = 1, 4
-     IF(de(ii) < thr2) THEN
+     IF(e(ii) < thr2) THEN
         IF(ii == 3) THEN
            CALL errore("dfpt_tetra_lindhard", "Nesting occurs.", 0)
         END IF
-        lnd(ii) = 0d0
-        de(ii) = 0d0
+        le(ii) = 0.0_dp
+        e(ii) = 0.0_dp
      ELSE
-        lnd(ii) = LOG(de(ii))
+        le(ii) = LOG(e(ii))
      END IF
   END DO
   !
-  IF(ABS(de(4) - de(3)) < thr ) THEN
-     IF(ABS(de(4) - de(2)) < thr ) THEN
-        IF(ABS(de(4) - de(1)) < thr ) THEN
+  IF(ABS(e(4) - e(3)) < thr ) THEN
+     IF(ABS(e(4) - e(2)) < thr ) THEN
+        IF(ABS(e(4) - e(1)) < thr ) THEN
            !
-           ! de(4) = de(3) = de(2) = de(1)
+           ! e(4) = e(3) = e(2) = e(1)
            !
-           w2(4) = 0.25d0 / de(4)
-           w2(3) = w2(4)
-           w2(2) = w2(4)
-           w2(1) = w2(4)
+           w(itetra(4)) = 0.25_dp / e(4)
+           w(itetra(3)) = w(itetra(4))
+           w(itetra(2)) = w(itetra(4))
+           w(itetra(1)) = w(itetra(4))
            !
         ELSE
            !
-           ! de(4) = de(3) = de(2)
+           ! e(4) = e(3) = e(2)
            !
-           w2(4) = dfpt_tetra_lindhard_1211(de(4),de(1),lnd(4),lnd(1))
-           w2(3) = w2(4)
-           w2(2) = w2(4)
-           w2(1) = dfpt_tetra_lindhard_1222(de(1),de(4),lnd(1),lnd(4))
+           w(itetra(4)) = dfpt_tetra_lindhard_1211(e(4),e(1),le(4),le(1))
+           w(itetra(3)) = w(itetra(4))
+           w(itetra(2)) = w(itetra(4))
+           w(itetra(1)) = dfpt_tetra_lindhard_1222(e(1),e(4),le(1),le(4))
            !
-           IF(ANY(w2(1:4) < 0d0)) THEN
-              WRITE(*,'(100e15.5)') de(1:4)
-              WRITE(*,'(100e15.5)') w2(1:4)
+           IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+              WRITE(*,'(100e15.5)') e(1:4)
+              WRITE(*,'(100e15.5)') w(itetra(1:4))
               CALL errore("dfpt_tetra_lindhard", "4=3=2", 0)
            END IF
            !
         END IF
-     ELSE IF(ABS(de(2) - de(1)) < thr ) THEN
+     ELSE IF(ABS(e(2) - e(1)) < thr ) THEN
         !
-        ! de(4) = de(3), de(2) = de(1)
+        ! e(4) = e(3), e(2) = e(1)
         !
-        w2(4) = dfpt_tetra_lindhard_1221(de(4),de(2), lnd(4),lnd(2))
-        w2(3) = w2(4)
-        w2(2) = dfpt_tetra_lindhard_1221(de(2),de(4), lnd(2),lnd(4))
-        w2(1) = w2(2)
+        w(itetra(4)) = dfpt_tetra_lindhard_1221(e(4),e(2), le(4),le(2))
+        w(itetra(3)) = w(itetra(4))
+        w(itetra(2)) = dfpt_tetra_lindhard_1221(e(2),e(4), le(2),le(4))
+        w(itetra(1)) = w(itetra(2))
         !
-        IF(ANY(w2(1:4) < 0d0)) THEN
-           WRITE(*,'(100e15.5)') de(1:4)
-           WRITE(*,'(100e15.5)') w2(1:4)
+        IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+           WRITE(*,'(100e15.5)') e(1:4)
+           WRITE(*,'(100e15.5)') w(itetra(1:4))
            CALL errore("dfpt_tetra_lindhard", "4=3 2=1", 0)
         END IF
         !
      ELSE
         !
-        ! de(4) = de(3)
+        ! e(4) = e(3)
         !
-        w2(4) = dfpt_tetra_lindhard_1231(de(4),de(1),de(2),lnd(4),lnd(1),lnd(2))
-        w2(3) = w2(4)
-        w2(2) = dfpt_tetra_lindhard_1233(de(2),de(1),de(4),lnd(2),lnd(1),lnd(4))
-        w2(1) = dfpt_tetra_lindhard_1233(de(1),de(2),de(4),lnd(1),lnd(2),lnd(4))
+        w(itetra(4)) = dfpt_tetra_lindhard_1231(e(4),e(1),e(2),le(4),le(1),le(2))
+        w(itetra(3)) = w(itetra(4))
+        w(itetra(2)) = dfpt_tetra_lindhard_1233(e(2),e(1),e(4),le(2),le(1),le(4))
+        w(itetra(1)) = dfpt_tetra_lindhard_1233(e(1),e(2),e(4),le(1),le(2),le(4))
         !
-        IF(ANY(w2(1:4) < 0d0)) THEN
-           WRITE(*,'(100e15.5)') de(1:4)
-           WRITE(*,'(100e15.5)') w2(1:4)
+        IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+           WRITE(*,'(100e15.5)') e(1:4)
+           WRITE(*,'(100e15.5)') w(itetra(1:4))
            CALL errore("dfpt_tetra_lindhard", "4=3", 0)
         END IF
         !
      END IF
-  ELSE IF(ABS(de(3) - de(2)) < thr) THEN
-     IF(ABS(de(3) - de(1)) < thr) THEN
+  ELSE IF(ABS(e(3) - e(2)) < thr) THEN
+     IF(ABS(e(3) - e(1)) < thr) THEN
         !
-        ! de(3) = de(2) = de(1)
+        ! e(3) = e(2) = e(1)
         !
-        w2(4) = dfpt_tetra_lindhard_1222(de(4),de(3), lnd(4),lnd(3))
-        w2(3) = dfpt_tetra_lindhard_1211(de(3),de(4), lnd(3),lnd(4))
-        w2(2) = w2(3)
-        w2(1) = w2(3)
+        w(itetra(4)) = dfpt_tetra_lindhard_1222(e(4),e(3), le(4),le(3))
+        w(itetra(3)) = dfpt_tetra_lindhard_1211(e(3),e(4), le(3),le(4))
+        w(itetra(2)) = w(itetra(3))
+        w(itetra(1)) = w(itetra(3))
         !
-        IF(ANY(w2(1:4) < 0d0)) THEN
-           WRITE(*,'(100e15.5)') de(1:4)
-           WRITE(*,'(100e15.5)') w2(1:4)
+        IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+           WRITE(*,'(100e15.5)') e(1:4)
+           WRITE(*,'(100e15.5)') w(itetra(1:4))
            CALL errore("dfpt_tetra_lindhard", "3=2=1", 0)
         END IF
         !
      ELSE
         !
-        ! de(3) = de(2)
+        ! e(3) = e(2)
         !
-        w2(4) = dfpt_tetra_lindhard_1233(de(4),de(1),de(3),lnd(4),lnd(1),lnd(3))
-        w2(3) = dfpt_tetra_lindhard_1231(de(3),de(1),de(4),lnd(3),lnd(1),lnd(4))
-        w2(2) = w2(3)
-        w2(1) = dfpt_tetra_lindhard_1233(de(1),de(4),de(3),lnd(1),lnd(4),lnd(3))
+        w(itetra(4)) = dfpt_tetra_lindhard_1233(e(4),e(1),e(3),le(4),le(1),le(3))
+        w(itetra(3)) = dfpt_tetra_lindhard_1231(e(3),e(1),e(4),le(3),le(1),le(4))
+        w(itetra(2)) = w(itetra(3))
+        w(itetra(1)) = dfpt_tetra_lindhard_1233(e(1),e(4),e(3),le(1),le(4),le(3))
         !
-        IF(ANY(w2(1:4) < 0d0)) THEN
-           WRITE(*,'(100e15.5)') de(1:4)
-           WRITE(*,'(100e15.5)') w2(1:4)
+        IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+           WRITE(*,'(100e15.5)') e(1:4)
+           WRITE(*,'(100e15.5)') w(itetra(1:4))
            CALL errore("dfpt_tetra_lindhard", "3=2", 0)
         END IF
         !
      END IF
-  ELSE IF(ABS(de(2) - de(1)) < thr) THEN
+  ELSE IF(ABS(e(2) - e(1)) < thr) THEN
      !
-     ! de(2) = de(1)
+     ! e(2) = e(1)
      !
-     w2(4) = dfpt_tetra_lindhard_1233(de(4),de(3),de(2),lnd(4),lnd(3),lnd(2))
-     w2(3) = dfpt_tetra_lindhard_1233(de(3),de(4),de(2),lnd(3),lnd(4),lnd(2))
-     w2(2) = dfpt_tetra_lindhard_1231(de(2),de(3),de(4),lnd(2),lnd(3),lnd(4))
-     w2(1) = w2(2)
+     w(itetra(4)) = dfpt_tetra_lindhard_1233(e(4),e(3),e(2),le(4),le(3),le(2))
+     w(itetra(3)) = dfpt_tetra_lindhard_1233(e(3),e(4),e(2),le(3),le(4),le(2))
+     w(itetra(2)) = dfpt_tetra_lindhard_1231(e(2),e(3),e(4),le(2),le(3),le(4))
+     w(itetra(1)) = w(itetra(2))
      !
-     IF(ANY(w2(1:4) < 0d0)) THEN
-        WRITE(*,'(100e15.5)') de(1:4)
-        WRITE(*,'(100e15.5)') w2(1:4)
+     IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+        WRITE(*,'(100e15.5)') e(1:4)
+        WRITE(*,'(100e15.5)') w(itetra(1:4))
         CALL errore("dfpt_tetra_lindhard", "2=1", 0)
      END IF
      !
@@ -2193,22 +1600,18 @@ SUBROUTINE dfpt_tetra_lindhard(ei,ej,w)
      !
      ! DIFferent each other.
      !
-     w2(4) = dfpt_tetra_lindhard_1234(de(4),de(1),de(2),de(3),lnd(4),lnd(1),lnd(2),lnd(3))
-     w2(3) = dfpt_tetra_lindhard_1234(de(3),de(1),de(2),de(4),lnd(3),lnd(1),lnd(2),lnd(4))
-     w2(2) = dfpt_tetra_lindhard_1234(de(2),de(1),de(3),de(4),lnd(2),lnd(1),lnd(3),lnd(4))
-     w2(1) = dfpt_tetra_lindhard_1234(de(1),de(2),de(3),de(4),lnd(1),lnd(2),lnd(3),lnd(4))
+     w(itetra(4)) = dfpt_tetra_lindhard_1234(e(4),e(1),e(2),e(3),le(4),le(1),le(2),le(3))
+     w(itetra(3)) = dfpt_tetra_lindhard_1234(e(3),e(1),e(2),e(4),le(3),le(1),le(2),le(4))
+     w(itetra(2)) = dfpt_tetra_lindhard_1234(e(2),e(1),e(3),e(4),le(2),le(1),le(3),le(4))
+     w(itetra(1)) = dfpt_tetra_lindhard_1234(e(1),e(2),e(3),e(4),le(1),le(2),le(3),le(4))
      !      
-     IF(ANY(w2(1:4) < 0d0)) THEN
-        WRITE(*,'(100e15.5)') de(1:4)
-        WRITE(*,'(100e15.5)') w2(1:4)
+     IF(ANY(w(itetra(1:4)) < 0.0_dp)) THEN
+        WRITE(*,'(100e15.5)') e(1:4)
+        WRITE(*,'(100e15.5)') w(itetra(1:4))
         CALL errore("dfpt_tetra_lindhard", "Something wrong.", 0)
      END IF
      !
   END IF
-  !
-  DO ii = 1, 4
-     w(1:4,ii) = w2(ii) * w(1:4,ii)
-  END DO
   !
 END SUBROUTINE dfpt_tetra_lindhard
 !
@@ -2227,9 +1630,9 @@ FUNCTION dfpt_tetra_lindhard_1234(g1,g2,g3,g4,lng1,lng2,lng3,lng4) RESULT(w)
   !
   REAL(dp) :: w2, w3, w4
   !
-  w2 = ((lng2 - lng1)/(g2 - g1)*g2 - 1d0)*g2/(g2 - g1)
-  w3 = ((lng3 - lng1)/(g3 - g1)*g3 - 1d0)*g3/(g3 - g1)
-  w4 = ((lng4 - lng1)/(g4 - g1)*g4 - 1d0)*g4/(g4 - g1)
+  w2 = ((lng2 - lng1)/(g2 - g1)*g2 - 1.0_dp)*g2/(g2 - g1)
+  w3 = ((lng3 - lng1)/(g3 - g1)*g3 - 1.0_dp)*g3/(g3 - g1)
+  w4 = ((lng4 - lng1)/(g4 - g1)*g4 - 1.0_dp)*g4/(g4 - g1)
   w2 = ((w2 - w3)*g2)/(g2 - g3)
   w4 = ((w4 - w3)*g4)/(g4 - g3)
   w = (w4 - w2)/(g4 - g2)
@@ -2251,11 +1654,11 @@ FUNCTION dfpt_tetra_lindhard_1231(g1,g2,g3,lng1,lng2,lng3) RESULT(w)
   !
   REAL(dp) :: w2, w3
   !
-  w2 = ((lng2 - lng1)/(g2 - g1)*g2 - 1d0)*g2**2/(g2 - g1) - g1/( &
-  &   2d0)
+  w2 = ((lng2 - lng1)/(g2 - g1)*g2 - 1.0_dp)*g2**2/(g2 - g1) - g1/( &
+  &   2.0_dp)
   w2 = w2/(g2 - g1)
-  w3 = ((lng3 - lng1)/(g3 - g1)*g3 - 1d0)*g3**2/(g3 - g1) - g1/( &
-  &   2d0)
+  w3 = ((lng3 - lng1)/(g3 - g1)*g3 - 1.0_dp)*g3**2/(g3 - g1) - g1/( &
+  &   2.0_dp)
   w3 = w3/(g3 - g1)
   w = (w3 - w2)/(g3 - g2)
   !
@@ -2276,13 +1679,13 @@ FUNCTION dfpt_tetra_lindhard_1233(g1,g2,g3,lng1,lng2,lng3) RESULT(w)
   !
   REAL(dp) :: w2, w3
   !
-  w2 = (lng2 - lng1)/(g2 - g1)*g2 - 1d0
+  w2 = (lng2 - lng1)/(g2 - g1)*g2 - 1.0_dp
   w2 = (g2*w2)/(g2 - g1)
-  w3 = (lng3 - lng1)/(g3 - g1)*g3 - 1d0
+  w3 = (lng3 - lng1)/(g3 - g1)*g3 - 1.0_dp
   w3 = (g3*w3)/(g3 - g1)
   w2 = (w3 - w2)/(g3 - g2)
-  w3 = (lng3 - lng1)/(g3 - g1)*g3 - 1d0
-  w3 = 1d0 - (2d0*w3*g1)/(g3 - g1)
+  w3 = (lng3 - lng1)/(g3 - g1)*g3 - 1.0_dp
+  w3 = 1.0_dp - (2.0_dp*w3*g1)/(g3 - g1)
   w3 = w3/(g3 - g1)
   w = (g3*w3 - g2*w2)/(g3 - g2)
   !
@@ -2301,10 +1704,10 @@ FUNCTION dfpt_tetra_lindhard_1221(g1,g2,lng1,lng2) RESULT(w)
   REAL(dp),INTENT(IN) :: g1, g2, lng1, lng2
   REAL(dp) :: w
   !
-  w = 1d0 - (lng2 - lng1)/(g2 - g1)*g1
-  w = -1d0 + (2d0*g2*w)/(g2 - g1)
-  w = -1d0 + (3d0*g2*w)/(g2 - g1)
-  w = w/(2d0*(g2 - g1))
+  w = 1.0_dp - (lng2 - lng1)/(g2 - g1)*g1
+  w = -1.0_dp + (2.0_dp*g2*w)/(g2 - g1)
+  w = -1.0_dp + (3.0_dp*g2*w)/(g2 - g1)
+  w = w/(2.0_dp*(g2 - g1))
   !
 END FUNCTION dfpt_tetra_lindhard_1221
 !
@@ -2321,10 +1724,10 @@ FUNCTION dfpt_tetra_lindhard_1222(g1,g2,lng1,lng2) RESULT(w)
   REAL(dp),INTENT(IN) :: g1, g2, lng1, lng2
   REAL(dp) :: w
   !
-  w = (lng2 - lng1)/(g2 - g1)*g2 - 1d0
-  w = (2d0*g1*w)/(g2 - g1) - 1d0
-  w = (3d0*g1*w)/(g2 - g1) + 1d0
-  w = w/(2d0*(g2 - g1))
+  w = (lng2 - lng1)/(g2 - g1)*g2 - 1.0_dp
+  w = (2.0_dp*g1*w)/(g2 - g1) - 1.0_dp
+  w = (3.0_dp*g1*w)/(g2 - g1) + 1.0_dp
+  w = w/(2.0_dp*(g2 - g1))
   !
 END FUNCTION dfpt_tetra_lindhard_1222
 !
@@ -2341,10 +1744,10 @@ FUNCTION dfpt_tetra_lindhard_1211(g1,g2,lng1,lng2) RESULT(w)
   REAL(dp),INTENT(IN) :: g1,g2,lng1,lng2
   REAL(dp) :: w
   !
-  w = -1d0 + (lng2 - lng1)/(g2 - g1)*g2
-  w = -1d0 + (2d0*g2*w)/(g2 - g1)
-  w = -1d0 + (3d0*g2*w)/(2d0*(g2 - g1))
-  w = w/(3d0*(g2 - g1))
+  w = -1.0_dp + (lng2 - lng1)/(g2 - g1)*g2
+  w = -1.0_dp + (2.0_dp*g2*w)/(g2 - g1)
+  w = -1.0_dp + (3.0_dp*g2*w)/(2.0_dp*(g2 - g1))
+  w = w/(3.0_dp*(g2 - g1))
   !
 END FUNCTION dfpt_tetra_lindhard_1211
 !

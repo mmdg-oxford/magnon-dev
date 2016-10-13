@@ -81,9 +81,9 @@ prepare_q.o \
 prepare_sym_analysis.o \
 psidspsi.o \
 psymdvscf.o \
-psyme.o \
+psymb.o \
 psym_dmag.o \
-psym_dmage.o \
+psym_dmagb.o \
 punch_plot_e.o \
 q_points.o \
 q2qstar_ph.o \
@@ -110,9 +110,9 @@ stop_ph.o \
 summarize.o \
 sym_def.o \
 sym_dmag.o \
-sym_dmage.o \
+sym_dmagb.o \
 symdvscf.o \
-syme.o \
+symb.o \
 symm.o \
 tra_write_matrix.o \
 transform_dbecsum_nc.o\

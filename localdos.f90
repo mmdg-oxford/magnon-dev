@@ -37,7 +37,7 @@ subroutine localdos (ldos, ldoss, dos_ef)
   USE control_ph, ONLY : nbnd_occ
   USE units_ph,   ONLY : iuwfc, lrwfc
   USE ktetra,         ONLY : ltetra
-  USE dfpt_tetra_mod, ONLY : dfpt_tetra_dlta
+  USE dfpt_tetra_mod, ONLY : dfpt_tetra_delta
 
   USE mp_global,        ONLY : inter_pool_comm
   USE mp,               ONLY : mp_sum
@@ -104,7 +104,7 @@ subroutine localdos (ldos, ldoss, dos_ef)
      do ibnd = 1, nbnd_occ (ik)
 
         if(ltetra) then
-           wdelta = dfpt_tetra_dlta(ibnd,ik)
+           wdelta = dfpt_tetra_delta(ibnd,ik)
         else
            wdelta = w0gauss ( (ef-et(ibnd,ik)) / degauss, ngauss) / degauss
         end if
