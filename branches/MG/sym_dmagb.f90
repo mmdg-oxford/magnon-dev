@@ -75,21 +75,55 @@ subroutine sym_dmagb (dvsym)
 !                                   s(3,kpol,invs(irot))*mag(3)
 !                 enddo
 !                 if (sname(irot)(1:3)=='inv') magrot=-magrot
-                 IF(t_rev(irot).eq.1) THEN
+             IF(t_rev(irot).eq.1) THEN
                  dvsym(i,j,k,2) = dvsym(i,j,k,2) + aux(ri,rj,rk,1) !+ mag(1)
                  dvsym(i,j,k,3) = dvsym(i,j,k,3) + aux(ri,rj,rk,2) !+ mag(2)
                  dvsym(i,j,k,4) = dvsym(i,j,k,4) + aux(ri,rj,rk,3) !+ mag(3)
+
+             ELSE IF(0 .eq. 1)THEN
+!                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + aux(ri,rj,rk,1) !+ mag(1)
+!                 dvsym(i,j,k,3) = dvsym(i,j,k,3) + aux(ri,rj,rk,2) !+ mag(2)
+!                 dvsym(i,j,k,4) = dvsym(i,j,k,4) + aux(ri,rj,rk,3) !+ mag(3)
+
+                 dmags=(0.d0,0.d0)
+                 do is=1,3
+                    dmags(is)= aux(ri,rj,rk,is)
+                 enddo
+                 do kpol = 1, 3
+                    mag(kpol)=bg(1,kpol)*dmags(1) + &
+                              bg(2,kpol)*dmags(2) + &
+                              bg(3,kpol)*dmags(3)
+                 enddo
+! rotate the magnetic moment
+                 do kpol = 1, 3
+                    magrot(kpol) = s(1,kpol,invs(irot))*mag(1) + &
+                                   s(2,kpol,invs(irot))*mag(2) + &
+                                   s(3,kpol,invs(irot))*mag(3)
+                 enddo
+                 magrot=-magrot
+                 if (sname(irot)(1:3)=='inv') magrot=-magrot
+! go back to cartesian coordinates
+                 do kpol = 1, 3
+                    mag(kpol)=at(kpol,1)*magrot(1) + &
+                              at(kpol,2)*magrot(2) + &
+                              at(kpol,3)*magrot(3)
+                 enddo
+
+                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + CONJG(mag(1))
+                 dvsym(i,j,k,3) = dvsym(i,j,k,3) + CONJG(mag(2))
+                 dvsym(i,j,k,4) = dvsym(i,j,k,4) + CONJG(mag(3))
+
 ! go back to cartesian coordinates
 !                 do kpol = 1, 3
 !                    mag(kpol)=at(kpol,1)*magrot(1) + &
 !                              at(kpol,2)*magrot(2) + &
 !                              at(kpol,3)*magrot(3)
 !                 enddo
-                 ELSE
+              ELSE
                  dvsym(i,j,k,2) = dvsym(i,j,k,2) + aux(ri,rj,rk,1) !+ mag(1)
                  dvsym(i,j,k,3) = dvsym(i,j,k,3) + aux(ri,rj,rk,2) !+ mag(2)
                  dvsym(i,j,k,4) = dvsym(i,j,k,4) + aux(ri,rj,rk,3) !+ mag(3)
-                 END IF
+              END IF
            enddo
         enddo
      enddo
