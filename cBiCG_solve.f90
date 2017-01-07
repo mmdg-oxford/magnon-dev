@@ -55,7 +55,7 @@ real(DP) :: &
 
 !HL upping iterations to get convergence with green_linsys?
 
-  integer, parameter :: maxiter = 200
+  integer, parameter :: maxiter = 100
   !integer, parameter :: maxter = 600
   !the maximum number of iterations
   integer :: iter, ibnd, lbnd, itol
@@ -86,7 +86,8 @@ real(DP) :: &
   complex(DP) :: e(nbnd), eu(nbnd)
 
   ! the scalar product
-  real(DP), allocatable :: rho (:), a(:), c(:), astar(:), cstar(:), b(:)
+  real(DP), allocatable :: rho (:), b(:)
+  complex(DP), allocatable:: a(:), c(:)
   ! the residue
   ! auxiliary for h_diag
   real(DP) :: kter_eff
@@ -127,6 +128,11 @@ real(DP) :: &
   call start_clock ('cbcgsolve')
 
   do iter = 1, maxiter
+
+!################ test #####################################
+IF(ik==1)Write(stdout, * ) 'iter', iter
+
+!##########################################################
     ! kter = kter + 1
     ! g    = (-PcDv\Psi) - (H \Delta\Psi)   ! AX
     ! gt   = conjg( g)
@@ -148,16 +154,16 @@ call mp_sum(  b(1:nbnd) , intra_pool_comm )
 
         do ibnd = 1, nbnd
            call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1) !g=r_0=b-Ax
-!           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
-           gt(:,ibnd) =  g(:,ibnd)   
+           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
+!           gt(:,ibnd) =  g(:,ibnd)   
            ! HL: for convergence with spin polarized along y
            ! KC: This should not change the results as along as it converges
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
            call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)  !Copy g to h
            if(tprec) call cg_psi(ndmx, ndim, 1, h(1,ibnd), h_diag(1,ibnd) )
-!           ht(:,ibnd) = dconjg( h(:,ibnd) )  
-           ht(:,ibnd) =  h(:,ibnd)    
+           ht(:,ibnd) = dconjg( h(:,ibnd) )  
+!           ht(:,ibnd) =  h(:,ibnd)    
            ! HL: for convergence with spin polarized along y
         enddo
      endif
@@ -203,7 +209,7 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
       if(conv(ibnd)/=1)then
       WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
                 &              " solve_linter: root not converged ",e10.3)') &
-                &              ik , ibnd, anorm
+                &              ik , ibnd, sqrt(rho(ibnd))
       end if
    end do
  end if 
@@ -247,7 +253,14 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
      do ibnd = 1, nbnd
         if (conv (ibnd) .eq.0) then
            lbnd=lbnd+1 
+
            alpha = a(lbnd) / c(lbnd)
+!###################### for test ########################
+      IF(ik==1)WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+                &              "  a(ibnd), c(ibnd), alpha ",4e10.3, f10.4)') ik, ibnd, a(lbnd), c(lbnd), abs(alpha)
+
+!#########################################################
+!           alpha = a(lbnd) / c(lbnd)
 ! x  = x  + alpha        * p
            call ZAXPY (ndmx*npol,  alpha,  h(1,ibnd), 1, dpsi(1,ibnd), 1)
 ! r  = r  - alpha        * q
@@ -275,6 +288,12 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
         if (conv (ibnd) .eq.0) then
            lbnd=lbnd+1         
            beta = - a(lbnd) / c(lbnd)
+!###################### for test ########################
+     IF(ik==1)WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+                &              "  a(ibnd), c(ibnd), beta ",4e10.3, f10.4)') ik, ibnd, a(lbnd), c(lbnd), abs(beta)
+
+!#########################################################
+
 ! pold  = p
 ! ptold = pt
 ! Extra Copy

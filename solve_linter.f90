@@ -433,7 +433,7 @@ END IF
               !  At the first iteration dpsi and dvscfin are set to zero
               !
  
-              dpsi(:,:) = (0.d0, 0.d0)
+              dpsi(:,:) = (10.d0, 1.d0)
 !              dpsim(:,:)     = (0.d0, 0.d0)
 !              dpsip(:,:)     = (0.d0, 0.d0)
               dvscfin (:, :) = (0.d0, 0.d0)
@@ -462,7 +462,8 @@ END IF
            else
            call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
                      npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
-
+!           call cbicgstabl(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
+!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, 2 ,.true.)
            endif
                    
 

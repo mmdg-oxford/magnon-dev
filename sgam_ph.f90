@@ -169,14 +169,19 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
            rabext(ipol)=rabext(ipol)+ DBLE( s(ipol,jpol,irot) )*abext(jpol)
         enddo
      enddo
-     sym (irot) = eqvect (raq, aq, zero, accep)
+!     sym (irot) = eqvect (raq, aq, zero, accep)
 !    if (sname(irot)(1:3)=='inv') rabext=-rabext
-!    if (t_rev(irot)==1) rabext=-rabext
+     if (t_rev(irot)==1) raq=-raq
      
 !     if(.not. do_elec) then
+       sym(irot) = .true.
        do ipol=1, 3
           sym(irot)=sym(irot) .and. (abs(raq(ipol)-aq(ipol))<1.0d-5)
        end do
+
+!       do ipol=1, 3
+!          sym(irot)= (abs(raq(ipol)-aq(ipol))<1.0d-5)
+!       end do
    
 !         bplus(:)= rabext(:)+abext(:)
 !         bminus(:) = rabext(:)-abext(:)

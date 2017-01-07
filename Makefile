@@ -25,6 +25,7 @@ ccg_psi.o \
 cgsolve_all.o \
 cgsolve_all_imfreq.o \
 cBiCG_solve.o \
+bicgstabl.o \
 ch_psi_all.o \
 check_initial_status.o \
 check_q_points_sym.o \
@@ -81,9 +82,7 @@ prepare_q.o \
 prepare_sym_analysis.o \
 psidspsi.o \
 psymdvscf.o \
-psymb.o \
 psym_dmag.o \
-psym_dmagb.o \
 punch_plot_e.o \
 q_points.o \
 q2qstar_ph.o \
