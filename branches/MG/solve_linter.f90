@@ -460,10 +460,10 @@ END IF
                              anorm, nbnd_occ(ikk), npol )
 
            else
-           call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
-                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
-!           call cbicgstabl(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
-!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, 2 ,.true.)
+!           call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
+!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
+           call cbicgstabl(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
+                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, 2 ,.false.)
            endif
                    
 

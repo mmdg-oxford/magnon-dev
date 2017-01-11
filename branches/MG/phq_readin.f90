@@ -351,7 +351,7 @@ SUBROUTINE phq_readin()
 !  CALL errore ('phq_readin', 'reading xq', ABS (ios) )
 !  CALL mp_bcast(xq, ionode_id )
 !  IF (.NOT.ldisp) THEN
-!     lgamma = xq (1) .EQ.0.D0.AND.xq (2) .EQ.0.D0.AND.xq (3) .EQ.0.D0
+     lgamma = xq (1) .EQ.0.D0.AND.xq (2) .EQ.0.D0.AND.xq (3) .EQ.0.D0
 !     IF ( (epsil.OR.zue) .AND..NOT.lgamma) CALL errore ('phq_readin', &
 !          'gamma is needed for elec.field', 1)
 !  ENDIF
@@ -539,11 +539,11 @@ end if
   lgamma_gamma=.FALSE.
 !  IF (.NOT.ldisp) THEN
 !     !
-!     IF (lgamma) THEN
-!        nksq = nks
-!     ELSE
-!        nksq = nks / 2
-!     ENDIF
+     IF (lgamma) THEN
+        nksq = nks
+     ELSE
+        nksq = nks / 2
+     ENDIF
 !  ENDIF
   !
   !
