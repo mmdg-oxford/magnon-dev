@@ -1,5 +1,5 @@
 SUBROUTINE cbicgstabl(h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
-     ndmx, ndim, ethr, ik, kter, conv_root, anorm, nbnd, npol, cw, lmresloc, tprec)
+     ndmx, ndim, ethr, ik, kter, conv_root, anorm, nbnd, npol, cw, lmresloc, tprec, itol)
 !
 !-----------------------------------------------------------------------
 !
@@ -32,9 +32,9 @@ integer ::   ndmx, &   ! input: the maximum dimension of the vectors
              nbnd, &   ! input: the number of bands
              npol, &   ! input: number of components of the wavefunctions
              ik,   &   ! input: the k point
-             niters, &  ! number of iterations for this BiCG min
              nrec, &    ! for composite rec numbers
-             lmresloc     ! set number of loops over minimal residuals...
+             lmresloc, &    ! set number of loops over minimal residuals...
+             itol
 
 real(DP) :: &
              anorm,   &        ! output: the norm of the error in the solution
@@ -42,30 +42,27 @@ real(DP) :: &
              h_diag(ndmx*npol,nbnd) ! input: an estimate of ( H - \epsilon )
 
 
-COMPLEX(DP) :: alphabeta(2), beta_old
+!COMPLEX(DP) :: alphabeta(2), beta_old
 
 complex(DP) :: &
              dpsi (ndmx*npol, nbnd), & ! output: the solution of the linear syst
              d0psi (ndmx*npol, nbnd)   ! input: the known term
 
 !GMRES part
-  complex(DP) :: tau(0:lmresloc ,0:lmresloc)
-  complex(DP) :: sigma(0:lmresloc)
-  complex(DP) :: gmgamma(0:lmresloc)
-  complex(DP) :: gmgammapp(0:lmresloc )
-  complex(DP) :: gmgammap(0:lmresloc)
-  complex(DP) :: gschmidt
+  complex(DP) :: tau(lmresloc ,lmresloc)
+  complex(DP) :: gmgamma(lmresloc), gmgammat(lmresloc)
 
 logical :: conv_root ! output: if true the root is converged
 external h_psi       ! input: the routine computing h_psi
 external cg_psi      ! input: the routine computing cg_psi
+external inv
 
 !
 !  here the local variables
 !
 
   !HL upping iterations to get convergence with green_linsys?
-  integer, parameter :: maxiter = 1
+  integer, parameter :: maxiter = 200
   !integer, parameter :: maxter = 600
   !the maximum number of iterations
   integer :: iter, ibnd, lbnd, iterj, iteri
@@ -86,7 +83,7 @@ external cg_psi      ! input: the routine computing cg_psi
 
   complex(DP), allocatable :: t(:,:), gt (:,:)
   complex(DP), allocatable :: alpha (:), omega (:)
-  complex(DP) ::  dcgamma, dclambda, beta
+  complex(DP) ::  dcgamma,  beta
   !  the ratio between rho
   !  step length
   complex(DP), external :: zdotc
@@ -99,12 +96,13 @@ external cg_psi      ! input: the routine computing cg_psi
   ! the residue
   ! auxiliary for h_diag
   real(DP) :: kter_eff
+  real(DP), allocatable:: rho0(:), b(:)
   ! account the number of iterations with b
   ! coefficient of quadratic form
   !
   call start_clock ('cgsolve')
 
- WRITE(stdout, *)'before allocation'
+! WRITE(stdout, *)'before allocation'
 
   allocate ( g(ndmx*npol,nbnd, 0:lmresloc), t(ndmx*npol,nbnd), & 
          h(ndmx*npol,nbnd, 0:lmresloc), hold(ndmx*npol, nbnd))
@@ -115,8 +113,9 @@ external cg_psi      ! input: the routine computing cg_psi
 !  allocate ( gp(ndmx*npol,nbnd), gtp(ndmx*npol,nbnd))
 !  allocate (a(nbnd), c(nbnd))
   allocate (conv ( nbnd))
+  allocate (rho0(nbnd),b(nbnd))
 
-WRITE(stdout, *)'after allocation'
+!WRITE(stdout, *)'after allocation'
 
   kter_eff = 0.d0
 
@@ -129,14 +128,15 @@ WRITE(stdout, *)'after allocation'
   t        = dcmplx(0.d0,0.d0)
   h        = dcmplx(0.d0,0.d0)
   hold     = dcmplx(0.d0,0.d0)
-  gt       = dcmplx(0.d0,0.d0)
+  gt       = dcmplx(1.d0,1.d0)
 !  gp(:,:)  = dcmplx(0.d0,0.0d0)
 !  gtp(:,:) = dcmplx(0.d0,0.0d0)
   rho      = dcmplx(1.0d0,0.0d0)
   rhoold   = dcmplx(1.0d0,0.0d0)
   omega    = dcmplx(1.0d0,0.0d0)
-  alpha    = dcmplx(0.0d0,0.0d0)
-!  sigma    = dcmplx(1.0d0, 0.0d0)
+  alpha    = dcmplx(1.0d0,0.0d0)
+gmgamma  = dcmplx(0.0d0,0.0d0)
+tau = dcmplx(0.0d0,0.0d0)
 
   do iter = 1, maxiter
   ! r    = b - Ax 
@@ -148,43 +148,64 @@ WRITE(stdout, *)'after allocation'
   ! a choice of lmresloc = 1 corresponds to the standard bicgstab.
   !H. A. Van Der Corst Siam J. Sci. Stat. Comput.
   !Vol. 13, No. 2, pp. 631-644
-            if (iter .eq. 1) then
+!            if (mod(iter, 20) .eq. 1) then
+             if (iter .eq. 1) then                           
                !initialize iter 0 stuff
                !r = b - A* x
                !rt = conjg (r) 
-!               call h_psi (ndim, dpsi, g(:, :, 0), e, cw, ik, nbnd)
+               call h_psi (ndim, dpsi, g(:, :, 0), e, cw, ik, nbnd)
 
                do ibnd = 1, nbnd
+!                  IF(conv(ibnd) .eq. 0)then
+
+!############################# for restart ################################
+!                  h(:,ibnd,0)= (0.d0, 0.d0)
+!                  alpha(ibnd)=(1.d0, 0.d0)
+!                  rhoold(ibnd)=(1.d0, 0.d0)
+!                  omega(ibnd)=(1.d0, 0.d0)
+!##########################################################################                  
                !initial residual should be r = b
                ! I/O for multishift.
                ! call davcio (d0psi(:,1), lrresid, iunresid, iter, +1)
-                  call zaxpy (ndmx*npol, (1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd, 0), 1)
-!                  call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd,0), 1)
+                  call zaxpy (ndmx*npol, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd, 0), 1)
+                  call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd,0), 1)
+                  if(tprec) call cg_psi(ndmx, ndim, 1, g(1,ibnd,0), h_diag(1,ibnd))
 
-
-!           if(tprec) call cg_psi(ndmx, ndim, 1, g(1,ibnd), h_diag(1,ibnd) )                                                                        
-
+!                  IF(itol==1)THEN
+                      call zcopy(ndmx*npol, d0psi(:,ibnd),  1, hold(:,  ibnd), 1)
+                      IF(tprec) call cg_psi(ndmx, ndim, 1, hold(1,ibnd),h_diag(1,ibnd))
+                      b(ibnd)= ABS(ZDOTC (ndmx*npol, hold(1,ibnd), 1, hold(1,ibnd), 1))
+                      IF(ik==1)write(stdout,'(i5, e10.3)')ibnd, b(ibnd)
+!                  END IF
     ! copy r -> u, i.e. u = r_{0}
     ! call zcopy (ndim, g (1, ibnd), 1, h (1, ibnd), 1)
     ! set \tilde{r} = r^{*}
     ! gt(:,ibnd)    = conjg ( g(:,ibnd) )
-                  gt(:,ibnd) = g(:,ibnd,0)
+                     gt(:,ibnd) = g(:,ibnd,0)
     !for preconditioning we solve the system MAx = Mb
     !x shouldn't change...
     !            gt = Mb
+!                 END IF
                enddo
             endif
 
-WRITE(stdout, *)'after initilization'
+  
+!WRITE(stdout, *)'after initilization'
 !####################### begin convergence check #############################
      lbnd = 0
      do ibnd = 1, nbnd
         if (conv (ibnd).eq.0) then
             lbnd = lbnd+1
-            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd, 0), 1, g(1,ibnd, 0), 1))
+!            rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd, 0), 1, g(1,ibnd, 0), 1))
 !            if(itol==1)rho(lbnd)=rho(lbnd)/b(ibnd)
+            rho0(ibnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd, 0), 1, g(1,ibnd, 0), 1))
+            IF(itol==1)rho0(ibnd)=rho0(ibnd)/b(ibnd)
+            anorm = sqrt(rho0(ibnd))
 
-         !!!!!KC: Here the convergence check is different from cg, why?
+            IF (anorm.lt.ethr) THEN
+               conv (ibnd) = 1
+            ENDIF
+         !!h!!KC: Here the convergence check is different from cg, why?
          !!!!! This is not a relative convergence threshold 
         endif
      enddo
@@ -192,18 +213,22 @@ WRITE(stdout, *)'after initilization'
      kter_eff = kter_eff + DBLE (lbnd) / DBLE (nbnd)
 
 ! sum within pools
-#ifdef __MPI
-call mp_sum(  rho(1:lbnd) , intra_pool_comm )
-#endif
+!#ifdef __MPI
+!call mp_sum(  rho(1:lbnd) , intra_pool_comm )
+!#endif
 
-     do ibnd = nbnd, 1, -1
-        if (conv(ibnd).eq.0) then
-            rho(ibnd) = rho(lbnd)
-            lbnd = lbnd-1
-            anorm = sqrt(rho(ibnd))
-            if (anorm.lt.ethr) conv (ibnd) = 1
-        endif
-     enddo
+!     do ibnd = nbnd, 1, -1
+!        if (conv(ibnd).eq.0) then
+!            rho0(ibnd) = rho(lbnd)
+!            lbnd = lbnd-1
+!            anorm = sqrt(rho0(ibnd))
+
+!            IF (anorm.lt.ethr) THEN
+!               conv (ibnd) = 1
+!            ENDIF
+
+!        endif
+!     enddo
 
      conv_root = .true.
      do ibnd = 1, nbnd
@@ -212,20 +237,22 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
 
      if (conv_root) goto 100
 
- !if (iter.eq.maxiter .and. .not.conv_root) then
- !  do ibnd=1, nbnd
- !     if(conv(ibnd)/=1)then
- !     WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
- !               &              " solve_linter: root not converged ",e10.3)') &
- !               &              ik , ibnd, sqrt(rho(ibnd))
- !     end if
- !  end do
- !end if
+ if (iter.eq.maxiter .and. .not.conv_root) then
+   do ibnd=1, nbnd
+      if(conv(ibnd)/=1)then
+      WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+                &              " solve_linter: root not converged ",e10.3)') &
+                &              ik , ibnd, sqrt(rho0(ibnd))
+      end if
+   end do
+ end if
 
-WRITE(stdout, *)'after convergence check'
+!WRITE(stdout, *)'after convergence check'
 !!##################### END convergence check ###########################
 !SUBROUTINE SAXPY(N,A,X,INCX,Y,INCY)
 !Y = A * X + Y
+
+rhoold(:)  = -omega(:)*rhoold(:)
 
 Do iterj=0, lmresloc-1
 
@@ -234,7 +261,7 @@ Do iterj=0, lmresloc-1
  Do ibnd=1,nbnd
    IF(conv(ibnd)/=1)THEN
 
-     rhoold(ibnd)  = -omega(ibnd)*rhoold(ibnd)
+!     rhoold(ibnd)  = -omega(ibnd)*rhoold(ibnd)
 !        do iterj = 0, lmresloc-1
                 rho(ibnd) = ZDOTC (ndmx*npol, g(1,ibnd, iterj), 1, gt(1,ibnd), 1)
                 beta    = alpha(ibnd)*(rho(ibnd)/rhoold(ibnd))
@@ -248,8 +275,7 @@ Do iterj=0, lmresloc-1
                    call ZAXPY (ndmx*npol,  (1.d0, 0.d0), g(1,ibnd, iteri), 1, h(1,ibnd, iteri), 1)
 !                   call ZCOPY (ndmx*npol,  hold(1, iteri),   1, h (1, iteri), 1)
                 enddo
-             
-!       enddo 
+!       enddo
 
    END IF
  END DO
@@ -258,32 +284,24 @@ Do iterj=0, lmresloc-1
      ! HLstab
      ! t = u_{j+1} = A u_{j}
 
-!           call h_psi (ndim, h(:,ibnd), hn(:,ibnd), e(1), cw, ik, nbnd)
-!           if(tprec) call cg_psi(ndmx, ndim, 1, hn(1,ibnd), h_diag(1,ibnd))
-    lbnd = 0                                                                  
-    do ibnd = 1, nbnd                                                         
-       if (conv(ibnd).eq.0) then
+    lbnd = 0
+    do ibnd = 1, nbnd
+      if (conv(ibnd).eq.0) then
            lbnd = lbnd + 1
            call zcopy(ndmx*npol, h(:,ibnd,iterj),  1, hold(:,  lbnd), 1)
-!           call zcopy(ndmx*npol, ht(1,ibnd), 1, htold(1, lbnd), 1)            
-           eu(lbnd) = e(ibnd)                                                 
+           eu(lbnd) = e(ibnd)
        endif
     enddo
 
     call h_psi (ndim, hold, t, eu(1), cw, ik, lbnd)
 
-!    lbnd = 0
-!    DO ibnd = 1,nbnd
-!      IF (conv(ibnd).eq.0) then
-!         lbnd = lbnd + 1
-!         call zcopy(ndmx*npol, t(1,lbnd),  1, h(1,  ibnd, iterj+1), 1)
-!      END IF 
-!    END DO
 
    lbnd=0
  DO ibnd = 1, nbnd
    IF (conv (ibnd) .eq.0) THEN
           lbnd=lbnd+1
+
+          if(tprec) call cg_psi(ndmx, ndim, 1, t(1,ibnd), h_diag(1,ibnd) )
 
           call zcopy(ndmx*npol, t(1,lbnd),  1, h(1,  ibnd, iterj+1), 1)
         
@@ -304,23 +322,24 @@ Do iterj=0, lmresloc-1
  END DO
 
 
-    lbnd = 0                                                                   
+lbnd = 0       
     DO ibnd = 1, nbnd                                               
-       IF (conv(ibnd).eq.0) then                                            
-           lbnd = lbnd + 1                                                     
+       IF (conv(ibnd).eq.0) then
+           lbnd = lbnd + 1
            call zcopy(ndmx*npol, g(1,ibnd,iterj),  1, hold(1,  lbnd), 1)
 
-           eu(lbnd) = e(ibnd)                                                  
-       endif                                                                   
-    enddo                                                                      
-                                                                               
-    call h_psi (ndim, hold, t , eu(1), cw, ik, lbnd)
+           eu(lbnd) = e(ibnd)
+       endif
+   enddo
 
-  
+   call h_psi (ndim, hold, t , eu(1), cw, ik, lbnd)
+
    lbnd =0 
    DO ibnd = 1, nbnd
       IF (conv(ibnd).eq.0) then
       lbnd = lbnd + 1
+
+      if(tprec) call cg_psi(ndmx, ndim, 1, t(1,ibnd), h_diag(1,ibnd) )
 
       call zcopy(ndmx*npol, t(:,lbnd),  1, g(:,  ibnd, iterj+1), 1)
 
@@ -331,10 +350,12 @@ Do iterj=0, lmresloc-1
 END DO   ! iterj
 
 
-WRITE(stdout, *)'after BICG part'
+!WRITE(stdout, *)'after BICG part'
+!call flush(6)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!Min Residual Part!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!IF(1==0)THEN
 
   DO ibnd = 1, nbnd
 
@@ -343,92 +364,57 @@ WRITE(stdout, *)'after BICG part'
 
     IF(conv(ibnd)/=1)THEN
 
+!  IF(1==0)THEN
 
-
-     do iterj = 1, lmresloc
-
-       IF(iterj>1)THEN
-          do iteri = 1, iterj-1
-            tau(iteri, iterj) = (1.0d0/sigma(iteri))*ZDOTC(ndmx*npol, g(1,ibnd, iterj), g(1,ibnd, iteri), 1)
+      do iteri = 1, lmresloc
+          
+          do iterj = 1, iteri
+            
+            tau(iteri, iterj) = ZDOTC(ndmx*npol, g(1,ibnd, iterj), 1, g(1,ibnd, iteri), 1)
 !orthogonalizes each residual:
-            call ZAXPY (ndmx*npol, -tau(iteri, iterj),  g(1,ibnd,iteri), 1, g(1,ibnd, iterj), 1)
-           enddo
-       END IF
-    
-!should correspond to van der vorst's:sleipjen:SGW
-!w=(t,s)(t,t):(\sigma_{1} = (\r_{1},\r_{1})), \gammap=(1/\sigma_{j})(\r_{0}, \r_{j}): 
-!sigma=(t,t) gmgammap=(1/sigma(j))*(ro,t)
-!sigma(iterj)   = ZDOTC(ndmx*npol, g(1,iterj), 1, g(1,iterj), 1)
-        sigma(iterj)   = ZDOTC(ndmx*npol, g(1,ibnd,iterj), 1, g(1,ibnd, iterj), 1) 
-!should be r_{1}! i.e. t 
-!gmgammap(iterj) = (1.0d0/sigma(iterj)) * ZDOTC(ndim, g(1,ibnd), 1, g(1,iterj), 1)
-!       gmgammap(iterj) = (1.0d0/sigma(iterj)) * ZDOTC(ndim, g(1,ibnd), 1, t(1,ibnd), 1)
-        gmgammap(iterj) = (1.0d0/sigma(iterj)) * ZDOTC(ndmx*npol, g(1,ibnd,0), 1, g(1,ibnd,iterj), 1)
+            IF(iteri/=iterj)tau(iterj, iteri) = dconjg(tau(iteri, iterj))
+!            IF(iteri/=iterj)tau(iterj, iteri) = tau(iteri, iterj)
+          end do
+
+       gmgamma(iteri) = ZDOTC(ndmx*npol, g(1,ibnd,0), 1, g(1,ibnd,iteri), 1)
 
      enddo  !iterj
 
+! calculate tau^{-1}
+     call inv(tau, lmresloc)
 
-!w = (t,s)(t,t) = (\sigma_{j} = (\r_{j}, \r_{j})), \gammap = (1/\sigma_{j})(\r_{0}, \r_{0})
-     gmgamma(lmresloc) = gmgammap(lmresloc)
-     omega(ibnd)      = gmgamma(lmresloc)
+     gmgammat(:)= gmgamma(:)
 
-
-!write(600,'(6f12.7)') gmgamma(:), omega
-!ok what's goin on here??
-     IF(lmresloc>1)THEN
-
-         do iterj = lmresloc-1, 1, -1
-            gschmidt = dcmplx(0.0d0, 0.0d0)
-         do iteri = iterj + 1, lmresloc
-            gschmidt = gschmidt + tau(iterj, iteri)*gmgamma(iteri)
-         enddo
-            gmgamma(iterj) = gmgammap(iterj) - gschmidt
-         enddo
+     call ZGEMV('N',lmresloc,lmresloc,(1.d0, 0.d0),tau,lmresloc, gmgammat, 1, (0.d0, 0.d0) , gmgamma, 1)
+     
+     omega(ibnd)=gmgamma(lmresloc)
+     
 
 
-        do iterj = 1, lmresloc-1
-           gschmidt = dcmplx(0.0d0, 0.0d0)
-           do iteri = iterj + 1, lmresloc-1
-              gschmidt = gschmidt + tau(iterj, iteri)*gmgamma(iteri + 1)
-           enddo
-              gmgammapp(iterj) = gmgamma(iterj+1) + gschmidt
-        enddo
-
-     END IF
-!The second update phase:
-!   do ibnd = 1, nbnd
-!      x  = x  + gmgamma(1)  * \hat{r}_{0}
-       call ZAXPY (ndmx*npol,  gmgamma(1), g(1,ibnd, 0),  1, dpsi(1,ibnd), 1)
-!     \hat{u}_{0}  = \hat{u}_{0}  +  beta  * u_old
-       call ZAXPY (ndmx*npol, -gmgamma(lmresloc), h(1,ibnd, lmresloc), 1, h(1,ibnd, 0), 1)
-!     \hat{r}_{0}  = \hat{r}_{0}  - gammap_{l}*r_{lmresloc}
-       call ZAXPY (ndmx*npol, -gmgammap(lmresloc), g(1,ibnd,lmresloc), 1, g(1,ibnd,0), 1)
-      !and again here we get to a point and then stop progressing...
-      !call ZAXPY (ndmx*npol, (gmgamma(lmresloc+1)), hn(1,ibnd), 1, h(1,ibnd), 1)
-      IF(lmresloc.gt.1) then
-
-        do iterj = 1, lmresloc-1
+        do iterj = 1, lmresloc
 !      \hat{u_0}  = \hat{u_0} + gmgamma(lmresloc)*u_{j}
         call ZAXPY (ndmx*npol, -(gmgamma(iterj)),   h  (1,ibnd,iterj), 1, h (1,ibnd, 0), 1)
 !      x_{0}  = x_{0} + gmgamma''_{j}  * r_{j}
-        call ZAXPY (ndmx*npol,  gmgammapp(iterj), g(1,ibnd,iterj),  1, dpsi  (1,ibnd), 1)
+        call ZAXPY (ndmx*npol,  gmgamma(iterj), g(1,ibnd,iterj-1),  1, dpsi  (1,ibnd), 1)
 !      r_{0}  = r_{0}  - gamma'_{j}*r_{j}
-        call ZAXPY (ndmx*npol, -(gmgammap(iterj)), g(1,ibnd, iterj), 1, g  (1,ibnd,0), 1)
+        call ZAXPY (ndmx*npol, -(gmgamma(iterj)), g(1,ibnd, iterj), 1, g  (1,ibnd,0), 1)
         enddo
 
-      END IF !lmresloc > 1
- 
+
      endif !conv(ibnd)
 
    enddo !ibnd
 
+
 enddo!maxter
 
-100 continue
+100  continue
+
+
 
   kter   =  kter_eff
   deallocate (conv)
-  deallocate (rho, rhoold, omega, alpha)
+  deallocate (rho, rhoold, omega, alpha, rho0, b)
   deallocate (g, t, h, hold)
   deallocate (gt)
 !  deallocate (gtp, gp)
@@ -436,3 +422,40 @@ enddo!maxter
   return
 END SUBROUTINE cbicgstabl
  
+
+! Returns the inverse of a matrix calculated by finding the LU
+! decomposition.  Depends on LAPACK.
+Subroutine inv(A, n)
+  implicit none
+  integer::n, info
+  complex(kind=8), intent(inout) :: A(n,n)
+!  complex(kind=8), dimension(size(A,1),size(A,2)) :: Ainv
+
+  complex(kind=8), allocatable :: work(:)  ! work array for LAPACK
+  integer, allocatable :: ipiv(:)   ! pivot indices
+
+  ! External procedures defined in LAPACK
+  external ZGETRF
+  external ZGETRI
+
+  allocate(work(n),ipiv(n))
+  ! Store A in Ainv to prevent it from being overwritten by LAPACK
+
+ ! write(*,*)'A', A
+ ! Write(*,*)'n', n
+  ! DGETRF computes an LU factorization of a general M-by-N matrix A
+  ! using partial pivoting with row interchanges.
+  call ZGETRF(n, n, A, n, ipiv, info)
+
+  if (info /= 0) then
+     stop 'Matrix is numerically singular!'
+  end if
+
+  ! DGETRI computes the inverse of a matrix using the LU factorization
+  ! computed by DGETRF.
+  call ZGETRI(n, A, n, ipiv, work, n, info)
+
+  if (info /= 0) then
+     stop 'Matrix inversion failed!'
+  end if
+end subroutine inv
