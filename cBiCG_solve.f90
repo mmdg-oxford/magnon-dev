@@ -86,7 +86,7 @@ real(DP) :: &
   complex(DP) :: e(nbnd), eu(nbnd)
 
   ! the scalar product
-  real(DP), allocatable :: rho (:), b(:)
+  real(DP), allocatable :: rho (:), b(:), rho0(:)
   complex(DP), allocatable:: a(:), c(:)
   ! the residue
   ! auxiliary for h_diag
@@ -100,8 +100,8 @@ real(DP) :: &
   allocate ( gp(ndmx*npol,nbnd), gtp(ndmx*npol,nbnd))
   allocate (a(nbnd), c(nbnd))
   allocate (conv ( nbnd))
-  allocate (rho(nbnd))
-  if(itol==1)allocate(b(nbnd))
+  allocate (rho(nbnd), rho0(nbnd))
+  allocate(b(nbnd))
  !WRITE(6,*) g,t,h,hold
  !Initialize
   eu(:) = dcmplx(0.0d0,0.0d0)
@@ -130,7 +130,7 @@ real(DP) :: &
   do iter = 1, maxiter
 
 !################ test #####################################
-IF(ik==1)Write(stdout, * ) 'iter', iter
+!IF(ik==1)Write(stdout, * ) 'iter', iter
 
 !##########################################################
     ! kter = kter + 1
@@ -144,7 +144,8 @@ IF(ik==1)Write(stdout, * ) 'iter', iter
         call h_psi (ndim, dpsi, g, e, cw, ik, nbnd)  !g=Ax   ! (H-e+\alpha |p><p|)dpsi left hand side of the linear equation
         do ibnd = 1, nbnd
            call zaxpy (ndmx*npol, (-1.d0,0.d0), d0psi(1,ibnd), 1, g(1,ibnd), 1)
-           IF(itol==1) b(ibnd) = abs(ZDOTC (ndmx*npol, d0psi(1,ibnd), 1, d0psi(1,ibnd), 1)) !calculate |b|^2      
+           b(ibnd) = abs(ZDOTC (ndmx*npol, d0psi(1,ibnd), 1, d0psi(1,ibnd), 1)) !calculate |b|^2    
+!           IF(ik==1)write(stdout,'(i5, e10.3)')ibnd, b(ibnd)
         end do 
 
 #ifdef __MPI
@@ -154,34 +155,35 @@ call mp_sum(  b(1:nbnd) , intra_pool_comm )
 
         do ibnd = 1, nbnd
            call zscal (ndmx*npol, (-1.0d0, 0.0d0), g(1,ibnd), 1) !g=r_0=b-Ax
-           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
-!           gt(:,ibnd) =  g(:,ibnd)   
+!           gt(:,ibnd) = dconjg ( g(:,ibnd) )       ! obtain r_0^*
+           gt(:,ibnd) =  g(:,ibnd)   
            ! HL: for convergence with spin polarized along y
            ! KC: This should not change the results as along as it converges
         !  p   =  inv(M) * r
         !  pt  =  conjg ( p )
            call zcopy (ndmx*npol, g (1, ibnd), 1, h (1, ibnd), 1)  !Copy g to h
            if(tprec) call cg_psi(ndmx, ndim, 1, h(1,ibnd), h_diag(1,ibnd) )
-           ht(:,ibnd) = dconjg( h(:,ibnd) )  
-!           ht(:,ibnd) =  h(:,ibnd)    
+!           ht(:,ibnd) = dconjg( h(:,ibnd) )  
+           ht(:,ibnd) =  h(:,ibnd)    
            ! HL: for convergence with spin polarized along y
         enddo
      endif
 
 !HL: Convergence check... 
-     lbnd = 0
-     do ibnd = 1, nbnd
-        if (conv (ibnd).eq.0) then
-            lbnd = lbnd+1
+     lbnd = 0                                                                  
+     do ibnd = 1, nbnd                                                         
+        if (conv (ibnd).eq.0) then                                             
+            lbnd = lbnd+1                                                      
             rho(lbnd) = abs(ZDOTC (ndmx*npol, g(1,ibnd), 1, g(1,ibnd), 1))
-            if(itol==1)rho(lbnd)=rho(lbnd)/b(ibnd)
-             
-         !!!!!KC: Here the convergence check is different from cg, why?
-         !!!!! This is not a relative convergence threshold 
-        endif
-     enddo
-
-     kter_eff = kter_eff + DBLE (lbnd) / DBLE (nbnd)
+                                                                              
+            if(itol==1)rho(lbnd)=rho(lbnd)/b(ibnd)                            
+                                                                               
+         !!!!!KC: Here the convergence check is different from cg, why?        
+         !!!!! This is not a relative convergence threshold                    
+        endif                                                                  
+     enddo                                                                     
+                                                                               
+     kter_eff = kter_eff + DBLE (lbnd) / DBLE (nbnd)                           
 
 ! sum within pools
 #ifdef __MPI
@@ -190,10 +192,14 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
 
      do ibnd = nbnd, 1, -1
         if (conv(ibnd).eq.0) then
-            rho(ibnd) = rho(lbnd)
+            rho0(ibnd) = rho(lbnd)
             lbnd = lbnd-1
-            anorm = sqrt(rho(ibnd))
-            if (anorm.lt.ethr) conv (ibnd) = 1
+            anorm = sqrt(rho0(ibnd))
+
+            IF (anorm.lt.ethr) THEN
+               conv (ibnd) = 1
+            end if
+
         endif
      enddo
 
@@ -202,17 +208,20 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
         conv_root = conv_root.and.(conv (ibnd).eq.1)
      enddo
 
-     if (conv_root) goto 100
-    
+     if (conv_root) THEN
+     goto 100
+     end if
+
  if (iter.eq.maxiter .and. .not.conv_root) then
    do ibnd=1, nbnd
       if(conv(ibnd)/=1)then
       WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
                 &              " solve_linter: root not converged ",e10.3)') &
-                &              ik , ibnd, sqrt(rho(ibnd))
+                &              ik , ibnd, sqrt(rho0(ibnd))
       end if
    end do
- end if 
+ end if
+
 ! we only apply hamiltonian to unconverged bands.
      lbnd = 0 
      do ibnd = 1, nbnd
@@ -256,8 +265,8 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
 
            alpha = a(lbnd) / c(lbnd)
 !###################### for test ########################
-      IF(ik==1)WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
-                &              "  a(ibnd), c(ibnd), alpha ",4e10.3, f10.4)') ik, ibnd, a(lbnd), c(lbnd), abs(alpha)
+!      IF(ik==1)WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+!                &              "  a(ibnd), c(ibnd), alpha ",4e10.3, f10.4)') ik, ibnd, a(lbnd), c(lbnd), abs(alpha)
 
 !#########################################################
 !           alpha = a(lbnd) / c(lbnd)
@@ -289,8 +298,8 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
            lbnd=lbnd+1         
            beta = - a(lbnd) / c(lbnd)
 !###################### for test ########################
-     IF(ik==1)WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
-                &              "  a(ibnd), c(ibnd), beta ",4e10.3, f10.4)') ik, ibnd, a(lbnd), c(lbnd), abs(beta)
+!     IF(ik==1)WRITE( stdout, '(5x,"kpoint",i4," ibnd",i4, &
+!                &              "  a(ibnd), c(ibnd), beta ",4e10.3, f10.4)') ik, ibnd, a(lbnd), c(lbnd), abs(beta)
 
 !#########################################################
 
@@ -310,6 +319,8 @@ call mp_sum(  rho(1:lbnd) , intra_pool_comm )
   enddo
 
 100 continue
+
+
   kter = kter_eff
   deallocate (rho)
   deallocate (conv)

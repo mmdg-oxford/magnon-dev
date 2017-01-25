@@ -419,6 +419,8 @@ END IF
               ELSE
               call davcio ( dpsi, lrdwf, iudwf, nrec, -1)
               END IF 
+           
+!              dpsi(:,:) = (1.0d0, 10.d0)
 !For frequency dependent case we will require two more wave functions
  !             call davcio ( dpsip, lrdwf, iudwfp, nrec, -1)
  !             call davcio ( dpsim, lrdwf, iudwfm, nrec, -1)
@@ -433,7 +435,8 @@ END IF
               !  At the first iteration dpsi and dvscfin are set to zero
               !
  
-              dpsi(:,:) = (10.d0, 1.d0)
+              dpsi(:,:) = (1.0d0, 1.d0)
+!               dpsi(:,:) = (0.d0, 0.d0)
 !              dpsim(:,:)     = (0.d0, 0.d0)
 !              dpsip(:,:)     = (0.d0, 0.d0)
               dvscfin (:, :) = (0.d0, 0.d0)
@@ -460,10 +463,10 @@ END IF
                              anorm, nbnd_occ(ikk), npol )
 
            else
-!           call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
-!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
-           call cbicgstabl(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
-                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, 2 ,.false.)
+           call cbcg_solve(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
+                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, .true.,0)
+!           call cbicgstabl(cch_psi_all, cg_psi, etc(1,ikk), dvpsi, dpsi, h_diag, &
+!                     npwx, npwq, thresh, ik, lter, conv_root, anorm, nbnd_occ(ikk), npol, cw, 4 ,.false., 0)
            endif
                    
 
@@ -767,10 +770,10 @@ write(stdout,'(5x," q,freq,drho in real space, "5f10.5,"  ",8f10.4)') xq(:), fiu
         WRITE(stdout, '(5x,"transverse magnetic response" )')
         if(convt)then
           write(stdout,'(5x,"convtchiq+-", 3f10.4, f12.5,"  ",4f14.7)') xq(:), real(fiu(iw))*13605.7, &
-          real((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
-          aimag((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0),&
-          real((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
-          aimag((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2.d0)
+          real((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2), &
+          aimag((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2),&
+          real((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2), &
+          aimag((drhoscf(1,2)-(0.d0,1.d0)*drhoscf(1,3))/2)
         else
           write(stdout,'(5x,"freq, chiq+-, "f12.5,"  ",4f14.7)') real(fiu(iw))*13605.7, &
           real((drhoscf(1,2)+(0.d0,1.d0)*drhoscf(1,3))/2.d0), &
