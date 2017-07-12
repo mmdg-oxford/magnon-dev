@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 !
 ! Copyright (C) 2001-2008 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
@@ -133,9 +136,9 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
   !
   ! return immediately (with minus_q=.true.) if xq=(0,0,0)
   !
-  minus_q = .true.
-  if ( (xq (1) == 0.d0) .and. (xq (2) == 0.d0) .and. (xq (3) == 0.d0) ) &
-       return
+!  minus_q = .true.
+!  if ( (xq (1) == 0.d0) .and. (xq (2) == 0.d0) .and. (xq (3) == 0.d0) ) &
+!       return
   !
   !   Set to zero some variables
   !
@@ -171,14 +174,26 @@ subroutine smallg_q (xq, modenum, at, bg, nrot, s, ftau, sym, minus_q)
      enddo
 !     sym (irot) = eqvect (raq, aq, zero, accep)
 !    if (sname(irot)(1:3)=='inv') rabext=-rabext
-     if (t_rev(irot)==1) raq=-raq
+!     IF(t_rev(irot)==1) THEN
+!        raq(:)=-raq(:)
+!        rabext(:) = -rabext(:)
+!        IF(sname(irot)(1:3)=='inv')rabext(:) = -rabext(:)
+!     ENDIF
+ 
      
-!     if(.not. do_elec) then
-       sym(irot) = .true.
-       do ipol=1, 3
-          sym(irot)=sym(irot) .and. (abs(raq(ipol)-aq(ipol))<1.0d-5)
-       end do
 
+!     if(.not. do_elec) then
+     sym(irot) = .true.
+
+     DO ipol=1, 3
+       sym(irot)=sym(irot) .and. (abs(raq(ipol)-aq(ipol))<1.0d-5)
+     ENDDO
+
+!     IF(t_rev(irot)==1) THEN
+!       Do ipol = 1, 3 
+!       sym(irot)=sym(irot) .and. (abs(rabext(ipol)-abext(ipol))<1.0d-5)
+!       ENDDO
+!     ENDIF
 !       do ipol=1, 3
 !          sym(irot)= (abs(raq(ipol)-aq(ipol))<1.0d-5)
 !       end do

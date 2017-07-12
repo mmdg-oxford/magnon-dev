@@ -1,4 +1,6 @@
-!
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 ! This routine reads a wavefunction in real space and transform it in Fourier space
 !
 ! Not tested for the non-collinear case.

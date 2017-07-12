@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 !
 ! Copyright (C) 2008 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
@@ -237,7 +240,7 @@ END IF
 #endif
 
 IF(reduce_io)THEN
-allocate (evc0 ( npwx*npol , nbnd, nks))
+!allocate (evc0 ( npwx*npol , nbnd, nks))
 io_level = -5
 END IF
 !KC: allocate the space for storing wavefunctions in memory

@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 !
 ! Copyright (C) 2001-2008 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
@@ -76,9 +79,9 @@ subroutine sym_dmagb (dvsym)
 !                 enddo
 !                 if (sname(irot)(1:3)=='inv') magrot=-magrot
              IF(t_rev(irot).eq.1) THEN
-                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + aux(ri,rj,rk,1) !+ mag(1)
-                 dvsym(i,j,k,3) = dvsym(i,j,k,3) + aux(ri,rj,rk,2) !+ mag(2)
-                 dvsym(i,j,k,4) = dvsym(i,j,k,4) + aux(ri,rj,rk,3) !+ mag(3)
+                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + conjg(aux(ri,rj,rk,1)) !+ mag(1)
+                 dvsym(i,j,k,3) = dvsym(i,j,k,3) + conjg(aux(ri,rj,rk,2)) !+ mag(2)
+                 dvsym(i,j,k,4) = dvsym(i,j,k,4) + conjg(aux(ri,rj,rk,3)) !+ mag(3)
 
              ELSE IF(0 .eq. 1)THEN
 !                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + aux(ri,rj,rk,1) !+ mag(1)
@@ -96,9 +99,9 @@ subroutine sym_dmagb (dvsym)
                  enddo
 ! rotate the magnetic moment
                  do kpol = 1, 3
-                    magrot(kpol) = s(1,kpol,invs(irot))*mag(1) + &
-                                   s(2,kpol,invs(irot))*mag(2) + &
-                                   s(3,kpol,invs(irot))*mag(3)
+                    magrot(kpol) = s(1,kpol,irot)*mag(1) + &
+                                   s(2,kpol,irot)*mag(2) + &
+                                   s(3,kpol,irot)*mag(3)
                  enddo
                  magrot=-magrot
                  if (sname(irot)(1:3)=='inv') magrot=-magrot
@@ -109,9 +112,9 @@ subroutine sym_dmagb (dvsym)
                               at(kpol,3)*magrot(3)
                  enddo
 
-                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + CONJG(mag(1))
-                 dvsym(i,j,k,3) = dvsym(i,j,k,3) + CONJG(mag(2))
-                 dvsym(i,j,k,4) = dvsym(i,j,k,4) + CONJG(mag(3))
+                 dvsym(i,j,k,2) = dvsym(i,j,k,2) + conjg(mag(1))
+                 dvsym(i,j,k,3) = dvsym(i,j,k,3) + conjg(mag(2))
+                 dvsym(i,j,k,4) = dvsym(i,j,k,4) + conjg(mag(3))
 
 ! go back to cartesian coordinates
 !                 do kpol = 1, 3

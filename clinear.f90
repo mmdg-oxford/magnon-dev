@@ -1,4 +1,6 @@
-
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
        SUBROUTINE clinear(nk1,nk2,nk3,nti,ntj,ntk,point,noint)
        USE kinds, ONLY : DP
        implicit none
