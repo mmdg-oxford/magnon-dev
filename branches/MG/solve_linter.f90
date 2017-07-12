@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 !
 ! Copyright (C) 2001-2009 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
@@ -686,7 +689,7 @@ END IF
 !   write(stdout, '("dvscfin after mix", 4f10.6)') dvscfin(100,1), dvscfin(100,2)
 !      CALL check_all_convt(convt, iter)
 
-     if (lmetq0.and.convt) call ef_shift (drhoscfh, ldos, ldoss, dos_ef, irr, npe, .true.)
+!     if (lmetq0.and.convt) call ef_shift (drhoscfh, ldos, ldoss, dos_ef, irr, npe, .true.)
 
 
      ! check that convergent have been reached on ALL processors in this image

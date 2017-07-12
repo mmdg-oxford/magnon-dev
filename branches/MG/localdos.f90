@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 !
 ! Copyright (C) 2001-2007 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
@@ -29,12 +32,12 @@ subroutine localdos (ldos, ldoss, dos_ef)
   USE noncollin_module, ONLY : noncolin, npol, nspin_mag
   USE wvfct,     ONLY : nbnd, npw, npwx, igk, et
   USE becmod, ONLY: calbec, bec_type, allocate_bec_type, deallocate_bec_type
-  USE wavefunctions_module,  ONLY: evc, psic, psic_nc
+  USE wavefunctions_module,  ONLY: evc, psic, psic_nc, evc0
   USE uspp, ONLY: okvan, nkb, vkb
   USE uspp_param, ONLY: upf, nh, nhm
   USE io_files, ONLY: iunigk
   USE qpoint,   ONLY : nksq
-  USE control_ph, ONLY : nbnd_occ
+  USE control_ph, ONLY : nbnd_occ, reduce_io
   USE units_ph,   ONLY : iuwfc, lrwfc
   USE ktetra,         ONLY : ltetra
   USE dfpt_tetra_mod, ONLY : dfpt_tetra_delta
@@ -97,7 +100,14 @@ subroutine localdos (ldos, ldoss, dos_ef)
      !
      ! unperturbed wfs in reciprocal space read from unit iuwfc
      !
-     if (nksq > 1) call davcio (evc, lrwfc, iuwfc, ik, - 1)
+     if (nksq > 1) THEN
+        IF(reduce_io==.true.)THEN
+        evc(:,:)=evc0(:,:, ik)
+        ELSE
+        call davcio (evc, lrwfc, iuwfc, ik, - 1)
+        ENDIF
+     END IF
+
      call init_us_2 (npw, igk, xk (1, ik), vkb)
      !
      call calbec ( npw, vkb, evc, becp)

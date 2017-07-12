@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 SUBROUTINE cbcg_solve(h_psi, cg_psi, e, d0psi, dpsi, h_diag, &
      ndmx, ndim, ethr, ik, kter, conv_root, anorm, nbnd, npol, cw, tprec, itol)
 !

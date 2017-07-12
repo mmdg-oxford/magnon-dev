@@ -1,4 +1,6 @@
-!
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 ! Copyright (C) 2003-2008 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'

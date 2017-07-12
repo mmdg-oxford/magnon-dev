@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
 !
 ! Copyright (C) 2001-2011 PWSCF group
 ! This file is distributed under the terms of the
@@ -327,7 +330,7 @@ SUBROUTINE phq_readin()
      CALL errore ('phq_readin', 'reading number of qpoints', ABS(ios) )
      CALL mp_bcast(num_k_pts, ionode_id )
      nqs=num_k_pts
-     if (num_k_pts > 50) call errore('phq_readin','Too many qpoints',1) 
+     if (num_k_pts > 100) call errore('phq_readin','Too many qpoints',1) 
      if (num_k_pts < 1) call errore('phq_readin','Too few qpoints',1) 
      IF (ionode) THEN
         !IF ( TRIM(card)=='K_POINTS'.OR. &

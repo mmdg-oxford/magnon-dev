@@ -1,3 +1,6 @@
+! This file is copied and modified from QUANTUM ESPRESSO
+! Kun Cao, Henry Lambert, Feliciano Giustino
+ 
   !
   !-----------------------------------------------------------------------
   subroutine mix_potential_c (ndim, vout, vin, alphamix, dr2, tr2, &
