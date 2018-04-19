@@ -82,7 +82,7 @@ PROGRAM magnon
   ! ... and begin with the initialization part
   !
   WRITE(stdout, '(/5x, "Reading variables")') 
-  CALL phq_readin()
+  CALL mag_readin()
   
   !do iq=1, num_k_pts
   !WRITE(stdout,*)xk_kpoints(1,iq), xk_kpoints(2,iq), xk_kpoints(3,iq)

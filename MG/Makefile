@@ -71,7 +71,7 @@ openfilq.o \
 orthogonalize.o \
 phcom.o \
 phq_init.o \
-phq_readin.o \
+mag_readin.o \
 phq_recover.o \
 phq_setup.o \
 phq_summary.o \

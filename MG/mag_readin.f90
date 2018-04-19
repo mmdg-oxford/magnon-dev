@@ -10,11 +10,11 @@
 !
 !
 !----------------------------------------------------------------------------
-SUBROUTINE phq_readin()
+SUBROUTINE mag_readin()
   !----------------------------------------------------------------------------
   !
-  !    This routine reads the control variables for the program phononq.
-  !    from standard input (unit 5).
+  !    This routine reads the control variables for the program Magnon.
+  !    from standard input (unit 5)
   !    A second routine readfile reads the variables saved on a file
   !    by the self-consistent program.
   !
@@ -54,7 +54,7 @@ SUBROUTINE phq_readin()
   USE io_files,      ONLY : tmp_dir, prefix
   USE noncollin_module, ONLY : i_cons, noncolin
   USE ldaU,          ONLY : lda_plus_u
-  USE control_flags, ONLY : iverbosity, modenum, twfcollect
+  USE control_flags, ONLY : iverbosity, twfcollect
   USE io_global,     ONLY : ionode, stdout
   USE mp_global,     ONLY : nproc_pool, nproc_pool_file, &
                             nimage, my_image_id,    &
@@ -93,52 +93,34 @@ SUBROUTINE phq_readin()
   LOGICAL, EXTERNAL  :: imatches
   LOGICAL, EXTERNAL  :: has_xml
   !
-  NAMELIST / INPUTPH / tr2_ph, amass, alpha_mix, niter_ph, nmix_ph,  &
-                       nat_todo, iverbosity, outdir, epsil,  &
-                       trans,  zue, zeu, max_seconds, reduce_io, &
-                       modenum, prefix, fildyn, fildvscf, fildrho, &
+  NAMELIST / INPUTPH / tr2_ph, alpha_mix, niter_ph, nmix_ph,  &
+                       iverbosity, outdir,  &
+                       max_seconds, reduce_io, &
+                       prefix, fildyn, fildvscf, fildrho, &
                        ldisp, nq1, nq2, nq3, recover,  &
-                       fpol, asr, lrpa, lnoloc, start_irr, last_irr, &
-                       start_q, last_q, nogg, ldiag, search_sym, lqdir, &
+                       fpol,lrpa, lnoloc, &
+                       start_q, last_q, nogg, lqdir, &
                        nk1, nk2, nk3, k1, k2, k3, &
-                       drho_star, dvscf_star, qpoints, dbext, do_elec, &
+                       qpoints, dbext, do_elec, &
                        dvext, transverse, symoff, man_kpoints, tetra_type, thresh_CG
 
   ! tr2_ph       : convergence threshold
-  ! amass        : atomic masses
   ! alpha_mix    : the mixing parameter
   ! niter_ph     : maximum number of iterations
   ! nmix_ph      : number of previous iterations used in mixing
-  ! nat_todo     : number of atom to be displaced
   ! iverbosity   : verbosity control
   ! outdir       : directory where input, output, temporary files reside
-  ! epsil        : if true calculate dielectric constant
-  ! trans        : if true calculate phonon
-  ! electron-phonon : select the kind of electron-phonon calculation
-  ! zue          : if .true. calculate effective charges ( d force / dE )
-  ! zeu          : if .true. calculate effective charges ( d P / du )
-  ! lraman       : if true calculate raman tensor
   ! max_seconds  : maximum cputime for this run
   ! reduce_io    : reduce I/O to the strict minimum
-  ! modenum      : single mode calculation
   ! prefix       : the prefix of files produced by pwscf
-  ! fildyn       : output file for the dynamical matrix
   ! fildvscf     : output file containing deltavsc
   ! fildrho      : output file containing deltarho
   ! fildrho_dir  : directory where fildrho files will be stored (default: outdir or ESPRESSO_FILDRHO_DIR variable)
-  ! eth_rps      : threshold for calculation of  Pc R |psi> (Raman)
-  ! eth_ns       : threshold for non-scf wavefunction calculation (Raman)
-  ! dek          : delta_xk used for wavefunctions derivation (Raman)
   ! recover      : recover=.true. to restart from an interrupted run
-  ! asr          : in the gamma_gamma case apply acoustic sum rule
   ! start_q      : in q list does the q points from start_q to last_q
   ! last_q       :
-  ! start_irr    : does the irred. representation from start_irr to last_irr
-  ! last_irr     :
   ! nogg         : if .true. lgamma_gamma tricks are not used
-  ! ldiag        : if .true. force diagonalization of the dyn mat
   ! lqdir        : if .true. each q writes in its own directory
-  ! search_sym   : if .true. analyze symmetry if possible
   ! nk1,nk2,nk3,
   ! ik1, ik2, ik3: when specified in input it uses for the phonon run
   !                a different mesh than that used for the charge density.
@@ -166,7 +148,7 @@ SUBROUTINE phq_readin()
   ENDIF
   !
   CALL mp_bcast(ios, ionode_id )
-  CALL errore( 'phq_readin', 'reading title ', ABS( ios ) )
+  CALL errore( 'mag_readin', 'reading title ', ABS( ios ) )
   CALL mp_bcast(title, ionode_id )
   !
   ! Rewind the input if the title is actually the beginning of inputph namelist
@@ -176,34 +158,24 @@ SUBROUTINE phq_readin()
     title='default'
     IF (ionode) REWIND(5, iostat=ios)
     CALL mp_bcast(ios, ionode_id )
-    CALL errore('phq_readin', 'Title line missing from input.', abs(ios))
+    CALL errore('mag_readin', 'Title line missing from input.', abs(ios))
   ENDIF
   !
   ! ... set default values for variables in namelist
   !
   tr2_ph       = 1.D-4
-  amass(:)     = 0.D0
   alpha_mix(:) = 0.D0
   alpha_mix(1) = 0.7D0
   niter_ph     = maxter
   nmix_ph      = 4
-  nat_todo     = 0
-  modenum      = 0
   iverbosity   = 0
-  trans        = .TRUE.
-  lrpa         = .FALSE.
   lnoloc       = .FALSE.
-  epsil        = .FALSE.
-  zeu          = .TRUE.
-  zue          = .FALSE.
   fpol         = .FALSE.
-  electron_phonon=' '
   max_seconds  =  1.E+7_DP
   reduce_io    = .FALSE.
   CALL get_env( 'ESPRESSO_TMPDIR', outdir )
   IF ( TRIM( outdir ) == ' ' ) outdir = './'
   prefix       = 'pwscf'
-  fildyn       = 'matdyn'
   fildrho      = ' '
   fildvscf     = ' '
   ldisp        = .FALSE.
@@ -212,14 +184,9 @@ SUBROUTINE phq_readin()
   nq3          = 0
   nogg         = .FALSE.
   recover      = .FALSE.
-  asr          = .FALSE.
-  start_irr    = 0
-  last_irr     = -1000
   start_q      = 1
   last_q       =-1000
-  ldiag        =.FALSE.
   lqdir        =.FALSE.
-  search_sym   =.true.
   nk1       = 0
   nk2       = 0
   nk3       = 0
@@ -265,7 +232,7 @@ SUBROUTINE phq_readin()
   IF (ionode) READ( 5, INPUTPH, IOSTAT = ios )
   !
   CALL mp_bcast(ios, ionode_id)
-  CALL errore( 'phq_readin', 'reading inputph namelist', ABS( ios ) )
+  CALL errore( 'mag_readin', 'reading inputph namelist', ABS( ios ) )
   !
   IF (ionode) tmp_dir = trimcheck (outdir)
 
@@ -280,39 +247,21 @@ SUBROUTINE phq_readin()
   !
   ! ... Check all namelist variables
   !
-  IF (tr2_ph <= 0.D0) CALL errore (' phq_readin', ' Wrong tr2_ph ', 1)
+  IF (tr2_ph <= 0.D0) CALL errore (' _readin', ' Wrong tr2_ph ', 1)
 
   DO iter = 1, maxter
      IF (alpha_mix (iter) .LT.0.D0.OR.alpha_mix (iter) .GT.1.D0) CALL &
-          errore ('phq_readin', ' Wrong alpha_mix ', iter)
+          errore ('mag_readin', ' Wrong alpha_mix ', iter)
   ENDDO
-  IF (niter_ph.LT.1.OR.niter_ph.GT.maxter) CALL errore ('phq_readin', &
+  IF (niter_ph.LT.1.OR.niter_ph.GT.maxter) CALL errore ('mag_readin', &
        ' Wrong niter_ph ', 1)
-  IF (nmix_ph.LT.1.OR.nmix_ph.GT.5) CALL errore ('phq_readin', ' Wrong &
+  IF (nmix_ph.LT.1.OR.nmix_ph.GT.5) CALL errore ('mag_readin', ' Wrong &
        &nmix_ph ', 1)
-  IF (iverbosity.NE.0.AND.iverbosity.NE.1) CALL errore ('phq_readin', &
+  IF (iverbosity.NE.0.AND.iverbosity.NE.1) CALL errore ('mag_readin', &
        &' Wrong  iverbosity ', 1)
-!  IF (fildyn.EQ.' ') CALL errore ('phq_readin', ' Wrong fildyn ', 1)
-  IF (max_seconds.LT.0.1D0) CALL errore ('phq_readin', ' Wrong max_seconds', 1)
+!  IF (fildyn.EQ.' ') CALL errore ('mag_readin', ' Wrong fildyn ', 1)
+  IF (max_seconds.LT.0.1D0) CALL errore ('mag_readin', ' Wrong max_seconds', 1)
 
-!  IF (modenum < 0) CALL errore ('phq_readin', ' Wrong modenum ', 1)
-!  IF (modenum /= 0) search_sym=.FALSE.
-  
-!  trans = trans .OR. ldisp
-   
-  !
-  !  We can calculate  dielectric, raman or elop tensors and no Born effective
-  !  charges dF/dE, but we cannot calculate Born effective charges dF/dE
-  !  without epsil.
-  !
-  ! IF (zeu) zeu = epsil
-  !
-  !    reads the q point (just if ldisp = .false.)
-  !
-  !IF (ionode) THEN
-  !   IF (.NOT. ldisp) &
-  !      READ (5, *, iostat = ios) (xq (ipol), ipol = 1, 3)
-  !END IF
 
  IF (qpoints) then
      num_k_pts = 0
@@ -327,11 +276,11 @@ SUBROUTINE phq_readin()
      ENDIF
      
      CALL mp_bcast(ios, ionode_id )
-     CALL errore ('phq_readin', 'reading number of qpoints', ABS(ios) )
+     CALL errore ('mag_readin', 'reading number of qpoints', ABS(ios) )
      CALL mp_bcast(num_k_pts, ionode_id )
      nqs=num_k_pts
-     if (num_k_pts > 100) call errore('phq_readin','Too many qpoints',1) 
-     if (num_k_pts < 1) call errore('phq_readin','Too few qpoints',1) 
+     if (num_k_pts > 100) call errore('mag_readin','Too many qpoints',1) 
+     if (num_k_pts < 1) call errore('mag_readin','Too few qpoints',1) 
      IF (ionode) THEN
         !IF ( TRIM(card)=='K_POINTS'.OR. &
         !     TRIM(card)=='k_points'.OR. &
@@ -343,28 +292,14 @@ SUBROUTINE phq_readin()
         !END IF
      END IF
      CALL mp_bcast(ios, ionode_id)
-     CALL errore ('phq_readin', 'reading QPOINTS card', ABS(ios) )
+     CALL errore ('mag_readin', 'reading QPOINTS card', ABS(ios) )
      CALL mp_bcast(xk_kpoints, ionode_id )
  ELSE
      num_k_pts = 1
  ENDIF
 
-! KC 
-!  CALL mp_bcast(ios, ionode_id)
-!  CALL errore ('phq_readin', 'reading xq', ABS (ios) )
-!  CALL mp_bcast(xq, ionode_id )
-!  IF (.NOT.ldisp) THEN
      lgamma = xq (1) .EQ.0.D0.AND.xq (2) .EQ.0.D0.AND.xq (3) .EQ.0.D0
-!     IF ( (epsil.OR.zue) .AND..NOT.lgamma) CALL errore ('phq_readin', &
-!          'gamma is needed for elec.field', 1)
-!  ENDIF
 
-!  IF (zue.AND..NOT.trans) CALL errore ('phq_readin', 'trans must be &
-!       &.t. for Zue calc.', 1)
-
-  !IF (trans.AND.(lrpa.OR.lnoloc)) CALL errore('phq_readin', &
-  !                  'only dielectric constant with lrpa or lnoloc',1)
-  !
   ! reads the frequencies ( just if fpol = .true. )
   !
   IF ( fpol ) THEN
@@ -378,10 +313,10 @@ SUBROUTINE phq_readin()
         ENDIF
      ENDIF
      CALL mp_bcast(ios, ionode_id )
-     CALL errore ('phq_readin', 'reading number of FREQUENCIES', ABS(ios) )
+     CALL errore ('mag_readin', 'reading number of FREQUENCIES', ABS(ios) )
      CALL mp_bcast(nfs, ionode_id )
-     if (nfs > nfsmax) call errore('phq_readin','Too many frequencies',1)
-     if (nfs < 1) call errore('phq_readin','Too few frequencies',1)
+     if (nfs > nfsmax) call errore('mag_readin','Too many frequencies',1)
+     if (nfs < 1) call errore('mag_readin','Too few frequencies',1)
      IF (ionode) THEN
         IF ( TRIM(card) == 'FREQUENCIES' .OR. &
              TRIM(card) == 'frequencies' .OR. &
@@ -393,7 +328,7 @@ SUBROUTINE phq_readin()
         END IF
      END IF
      CALL mp_bcast(ios, ionode_id)
-     CALL errore ('phq_readin', 'reading FREQUENCIES card', ABS(ios) )
+     CALL errore ('mag_readin', 'reading FREQUENCIES card', ABS(ios) )
      CALL mp_bcast(fiu, ionode_id )
   ELSE
      nfs=0
@@ -416,10 +351,6 @@ end if
   !   Here we finished the reading of the input file.
   !   Now allocate space for pwscf variables, read and check them.
   !
-  !   amass will also be read from file:
-  !   save its content in auxiliary variables
-  !
-  ! amass_input(:)= amass(:)
   !
   tmp_dir_save=tmp_dir
   tmp_dir_ph= TRIM (tmp_dir) // '_ph' // TRIM(int_to_char(my_image_id)) //'/'
@@ -442,9 +373,10 @@ end if
    newgrid = .true.
 
 
-  !KC: input for the new kpoints grid, which includes a coarse grid for ground state
+  !KC:manual input for the new kpoints grid, which includes a coarse grid for ground state (GS)
   !scf calculation and a dense selected grid for response only.
   !The grid may be highly nonuniform
+  !To avoid the so-called gap error, a same kpoints grid should be used for GS and MG calculations
   IF(ionode .and. man_kpoints)OPEN(1111,file='KPOINTS',status='old')
   
   !KC: kpoints must be input in cartisian coordinates
@@ -462,10 +394,10 @@ end if
      ENDIF
 
      CALL mp_bcast(ios, ionode_id )
-     CALL errore ('phq_readin', 'reading number of kpoints', ABS(ios) )
+     CALL errore ('mag_readin', 'reading number of kpoints', ABS(ios) )
      CALL mp_bcast(nkstot, ionode_id )
-     if (num_k_pts > npk) call errore('phq_readin','Too many kpoints',1)
-     if (num_k_pts < 1) call errore('phq_readin','Too few kpoints',1)
+     if (num_k_pts > npk) call errore('mag_readin','Too many kpoints',1)
+     if (num_k_pts < 1) call errore('mag_readin','Too few kpoints',1)
      IF (ionode) THEN
            DO i = 1, nkstot
              !should be in units of 2pi/a0 cartesian co-ordinates
@@ -473,7 +405,7 @@ end if
            END DO
      END IF
      CALL mp_bcast(ios, ionode_id)
-     CALL errore ('phq_readin', 'reading KPOINTS file', ABS(ios) )
+     CALL errore ('mag_readin', 'reading KPOINTS file', ABS(ios) )
      CALL mp_bcast(xk, ionode_id)
      CALL mp_bcast(wk, ionode_id)
  
@@ -484,46 +416,46 @@ end if
   tmp_dir=tmp_dir_save
   !
 
-  IF (gamma_only) CALL errore('phq_readin',&
+  IF (gamma_only) CALL errore('mag_readin',&
      'cannot start from pw.x data file using Gamma-point tricks',1)
 
-  IF (okpaw.and.noncolin.and.domag) CALL errore('phq_readin',&
+  IF (okpaw.and.noncolin.and.domag) CALL errore('mag_readin',&
      'The phonon code with paw and domag is not available yet',1)
 
-  IF (lmovecell) CALL errore('phq_readin', &
-      'The phonon code is not working after vc-relax',1)
+  IF (lmovecell) CALL errore('mag_readin', &
+      'The magnon code is not working after vc-relax',1)
 
   IF (nproc_image /= nproc_image_file .and. .not. twfcollect)  &
-     CALL errore('phq_readin',&
+     CALL errore('mag_readin',&
      'pw.x run with a different number of processors. Use wf_collect=.true.',1)
 
   IF (nproc_pool /= nproc_pool_file .and. .not. twfcollect)  &
-     CALL errore('phq_readin',&
+     CALL errore('mag_readin',&
      'pw.x run with a different number of pools. Use wf_collect=.true.',1)
 
   IF (get_ntask_groups() > 1) &
-     CALL errore('phq_readin','task_groups not available in phonon',1)
+     CALL errore('mag_readin','task_groups not available in magnon',1)
 
   IF (nbgrp > 1) &
-     CALL errore('phq_readin','band parallelization not available in phonon',1)
+     CALL errore('mag_readin','band parallelization not available in magnon',1)
 
 
   IF (.NOT.ldisp) lqdir=.FALSE.
 
   IF (i_cons /= 0) &
-     CALL errore('phq_readin',&
+     CALL errore('mag_readin',&
      'The phonon code with constrained magnetization is not yet available',1)
 
   IF (two_fermi_energies .AND. (ltetra .OR. lgauss)) &
-     CALL errore('phq_readin',&
+     CALL errore('mag_readin',&
      'The phonon code with two fermi energies is not available for metals',1)
 
-  IF (tqr) CALL errore('phq_readin',&
+  IF (tqr) CALL errore('mag_readin',&
      'The phonon code with Q in real space not available',1)
 
-  IF (start_irr < 0 ) CALL errore('phq_readin', 'wrong start_irr',1)
+  IF (start_irr < 0 ) CALL errore('mag_readin', 'wrong start_irr',1)
   !
-  IF (start_q <= 0 ) CALL errore('phq_readin', 'wrong start_q',1)
+  IF (start_q <= 0 ) CALL errore('mag_readin', 'wrong start_q',1)
   !
   !  the dynamical matrix is written in xml format if fildyn ends in
   !  .xml or in the noncollinear case.
@@ -551,40 +483,16 @@ end if
   !
   !
   !
-  CALL allocate_part ( nat )
-  !
-  IF ( nat_todo < 0 .OR. nat_todo > nat ) &
-     CALL errore ('phq_readin', 'nat_todo is wrong', 1)
-  IF (nat_todo.NE.0) THEN
-     IF (ionode) &
-     READ (5, *, iostat = ios) (atomo (na), na = 1, &
-          nat_todo)
-     CALL mp_bcast(ios, ionode_id )
-     CALL errore ('phq_readin', 'reading atoms', ABS (ios) )
-     CALL mp_bcast(atomo, ionode_id )
-  ENDIF
-  nat_todo_input=nat_todo
-
-  IF (epsil.AND.lgauss) &
-        CALL errore ('phq_readin', 'no elec. field with metals', 1)
-  IF (modenum > 0) THEN
-     IF ( ldisp ) &
-          CALL errore('phq_readin','Dispersion calculation and &
-          & single mode calculation not possibile !',1)
-     nat_todo = 0
-  ENDIF
-
-  !
   IF (ldisp .AND. (nq1 .LE. 0 .OR. nq2 .LE. 0 .OR. nq3 .LE. 0)) &
-       CALL errore('phq_readin','nq1, nq2, and nq3 must be greater than 0',1)
+       CALL errore('mag_readin','nq1, nq2, and nq3 must be greater than 0',1)
 
     !
-!  IF (nspin /= 1 .and. elph_file /= 0) CALL errore ('phq_readin', &
+!  IF (nspin /= 1 .and. elph_file /= 0) CALL errore ('mag_readin', &
 !  &  'Elphfile with lsda have not been available', 1)
   !
-  IF (nspin == 2 .and. ltetra) CALL errore ('phq_readin', &
+  IF (nspin == 2 .and. ltetra) CALL errore ('mag_readin', &
   &  'Tetrahedron method with lsda have not been available', 1)
   !
   RETURN
   !
-END SUBROUTINE phq_readin
+END SUBROUTINE mag_readin
